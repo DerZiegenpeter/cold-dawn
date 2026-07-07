@@ -1,0 +1,35 @@
+[gd_scene format=3 uid="uid://dh8kpne5vj6mw"]
+
+[ext_resource type="Script" uid="uid://ce3gawa6yeau4" path="res://scripts/Globe.gd" id="1_rvslj"]
+[ext_resource type="Script" uid="uid://ikkbn265ijml" path="res://scripts/Camera.gd" id="2_0bbpv"]
+
+[sub_resource type="Environment" id="Environment_0bj4a"]
+background_mode = 2
+glow_enabled = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rvslj"]
+albedo_color = Color(0, 0, 0, 1)
+metallic = 1.0
+
+[sub_resource type="SphereMesh" id="SphereMesh_0bj4a"]
+material = SubResource("StandardMaterial3D_rvslj")
+radius = 500.0
+height = 1000.0
+
+[node name="Main" type="Node3D" unique_id=898251091]
+
+[node name="Globe" type="Node3D" parent="." unique_id=1440852955]
+script = ExtResource("1_rvslj")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=457430867]
+script = ExtResource("2_0bbpv")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=845198444]
+transform = Transform3D(1, 0, 0, 0, 0.8660254, 0.5, 0, -0.5, 0.8660254, 0, 10, 5)
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=989695836]
+environment = SubResource("Environment_0bj4a")
+
+[node name="GlobeMesh" type="MeshInstance3D" parent="." unique_id=595785374]
+visible = false
+mesh = SubResource("SphereMesh_0bj4a")
