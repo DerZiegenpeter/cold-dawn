@@ -12,9 +12,6 @@ class_name OrbitalCamera
 @export var states_fade_start: float = 850.0
 @export var states_fade_end: float = 550.0
 
-@export var rivers_lakes_fade_start: float = 380.0
-@export var rivers_lakes_fade_end: float = 180.0
-
 var yaw: float = 30.0
 var pitch: float = 15.0
 var distance: float = 1400.0
@@ -25,7 +22,7 @@ var target_distance: float = 1400.0
 var is_dragging := false
 var last_mouse_pos := Vector2.ZERO
 
-@onready var globe: Node3D = get_node_or_null("../Globe")
+@onready var globe: Globe = get_node_or_null("../Globe")
 
 func _ready() -> void:
 	if not target:
@@ -36,13 +33,24 @@ func _ready() -> void:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT:
+		if event.button_index == MOUSE_BUTTON_MIDDLE:
 			is_dragging = event.pressed
 			last_mouse_pos = event.position
+
+		elif event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			_try_select_state()
+
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			target_distance = max(min_distance, target_distance * 0.96)
+			var zoom_factor := 0.96
+			if distance < 800:
+				zoom_factor = lerp(0.993, 0.96, clamp((distance - 505) / 295.0, 0.0, 1.0))
+			target_distance = max(min_distance, target_distance * zoom_factor)
+
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			target_distance = min(max_distance, target_distance * 1.04)
+			var zoom_factor := 1.04
+			if distance < 800:
+				zoom_factor = lerp(1.007, 1.04, clamp((distance - 505) / 295.0, 0.0, 1.0))
+			target_distance = min(max_distance, target_distance * zoom_factor)
 
 	elif event is InputEventMouseMotion and is_dragging:
 		var delta: Vector2 = event.position - last_mouse_pos
@@ -59,13 +67,11 @@ func _process(delta: float) -> void:
 	_update_position()
 
 	if globe:
-		_fade_coastlines_vs_states()
-		_fade_layer("States", states_fade_start, states_fade_end)
-		_fade_layer("Cities", states_fade_start, states_fade_end)
-		_fade_layer("Rivers", rivers_lakes_fade_start, rivers_lakes_fade_end)
-		_fade_layer("Lakes", rivers_lakes_fade_start, rivers_lakes_fade_end)
+		_fade_coastlines()
+		_fade_all_states()
+		_fade_cities()
 
-func _fade_coastlines_vs_states() -> void:
+func _fade_coastlines() -> void:
 	var coast := globe.get_node_or_null("Coastlines")
 	if not coast: return
 	var mat := coast.material_override as StandardMaterial3D
@@ -75,38 +81,76 @@ func _fade_coastlines_vs_states() -> void:
 	if distance < 550:
 		alpha = 0.0
 	elif distance < 900:
-		var t := (distance - 550) / (900 - 550)
-		alpha = clamp(t, 0.0, 1.0)
+		alpha = clamp((distance - 550) / 350.0, 0.0, 1.0)
 
 	var col = mat.albedo_color
 	col.a = lerp(col.a, alpha, 0.15)
 	mat.albedo_color = col
 
-func _fade_layer(layer_name: String, fade_start: float, fade_end: float) -> void:
-	var layer := globe.get_node_or_null(layer_name)
-	if not layer or not layer is MeshInstance3D: return
+func _fade_all_states() -> void:
+	if not globe: return
+	for child in globe.get_children():
+		if child is MeshInstance3D and child.name.begins_with("State_"):
+			var mat := child.material_override as StandardMaterial3D
+			if not mat: continue
 
-	var mat := layer.material_override as StandardMaterial3D
+			var alpha := 1.0
+			if distance > states_fade_start:
+				alpha = 0.0
+			elif distance < states_fade_end:
+				alpha = 1.0
+			else:
+				alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
+
+			var col = mat.albedo_color
+			col.a = lerp(col.a, alpha, 0.4)
+			if distance < states_fade_end + 30:
+				col.a = 1.0
+			mat.albedo_color = col
+
+func _fade_cities() -> void:
+	var cities_node := globe.get_node_or_null("Cities")
+	if not cities_node: return
+	var mat := cities_node.material_override as StandardMaterial3D
 	if not mat: return
 
 	var alpha := 1.0
-	if distance > fade_start:
+	if distance > states_fade_start:
 		alpha = 0.0
-	elif distance < fade_end:
+	elif distance < states_fade_end:
 		alpha = 1.0
 	else:
-		var t := (fade_start - distance) / (fade_start - fade_end)
-		alpha = clamp(t, 0.0, 1.0)
+		alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
 
-	# Wichtiger Fix: Sichere Methode + aggressives Blenden
 	var col = mat.albedo_color
 	col.a = lerp(col.a, alpha, 0.4)
-
-	# Hard Override: Wenn sehr nah → sofort voll sichtbar
-	if distance < fade_end + 30:
+	if distance < states_fade_end + 30:
 		col.a = 1.0
-
 	mat.albedo_color = col
+
+func _try_select_state() -> void:
+	if not globe: return
+
+	var mouse_pos := get_viewport().get_mouse_position()
+	var from := project_ray_origin(mouse_pos)
+	var to := from + project_ray_normal(mouse_pos) * 3000
+
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	var result := get_world_3d().direct_space_state.intersect_ray(query)
+
+	if result:
+		var hit_node = result.collider
+		if hit_node is MeshInstance3D and hit_node.name.begins_with("State_"):
+			var state_id := int(hit_node.name.split("_")[1])
+			if globe.state_data.has(state_id):
+				var data = globe.state_data[state_id]
+				print("=== State angeklickt ===")
+				print("ID:        ", data.get("id"))
+				print("Name:      ", data.get("name"))
+				print("Owner:     ", data.get("owner"))
+				print("Controller:", data.get("controller"))
+				print("Cities:    ", data.get("cities", []))
+				print("========================")
 
 func _update_position() -> void:
 	if not target: return
