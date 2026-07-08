@@ -105,37 +105,16 @@ func create_states() -> void:
 		var props = feature.get("properties", {})
 		var raw_name = props.get("name")
 		var state_name = raw_name if raw_name != null else "Unknown"
-		var norm_name := normalize_name(state_name)
 
-		# === Verbessertes Matching ===
-		var state_id := -1
+		# ID nach Reihenfolge vergeben (genau wie beim Generieren von states.json)
+		var state_id := index
 
-		# 1. Normalisiertes exaktes Matching
-		for id in state_data:
-			if normalize_name(state_data[id]["name"]) == norm_name:
-				state_id = id
-				break
-
-		# 2. Fallback über name_en
-		if state_id == -1:
-			var norm_en := normalize_name(props.get("name_en", ""))
-			for id in state_data:
-				if normalize_name(state_data[id].get("name", "")) == norm_en:
-					state_id = id
-					break
-
-		# 3. Fallback: Teilstring-Match
-		if state_id == -1:
-			for id in state_data:
-				var data_name := normalize_name(state_data[id]["name"])
-				if norm_name in data_name or data_name in norm_name:
-					state_id = id
-					break
-
-		if state_id == -1:
+		# Versuche trotzdem Daten zu laden (für Owner/Controller/Cities)
+		if state_data.has(state_id):
+			# Daten gefunden → alles gut
+			pass
+		else:
 			no_data += 1
-			# Fallback: Wir nehmen die Reihenfolge als ID (sollte bei 7 fehlenden helfen)
-			state_id = index
 
 		var vertices := PackedVector3Array()
 		_add_geometry(feature.get("geometry", {}), vertices)
