@@ -25,8 +25,7 @@ var last_mouse_pos := Vector2.ZERO
 @onready var globe: Globe = get_node_or_null("../Globe")
 
 func _ready() -> void:
-	if not target:
-		target = get_node_or_null("../Globe")
+	if not target: target = get_node_or_null("../Globe")
 	distance = start_distance
 	target_distance = start_distance
 	_update_position()
@@ -78,10 +77,8 @@ func _fade_coastlines() -> void:
 	if not mat: return
 
 	var alpha := 1.0
-	if distance < 550:
-		alpha = 0.0
-	elif distance < 900:
-		alpha = clamp((distance - 550) / 350.0, 0.0, 1.0)
+	if distance < 550: alpha = 0.0
+	elif distance < 900: alpha = clamp((distance - 550) / 350.0, 0.0, 1.0)
 
 	var col = mat.albedo_color
 	col.a = lerp(col.a, alpha, 0.15)
@@ -95,17 +92,13 @@ func _fade_all_states() -> void:
 			if not mat: continue
 
 			var alpha := 1.0
-			if distance > states_fade_start:
-				alpha = 0.0
-			elif distance < states_fade_end:
-				alpha = 1.0
-			else:
-				alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
+			if distance > states_fade_start: alpha = 0.0
+			elif distance < states_fade_end: alpha = 1.0
+			else: alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
 
 			var col = mat.albedo_color
 			col.a = lerp(col.a, alpha, 0.4)
-			if distance < states_fade_end + 30:
-				col.a = 1.0
+			if distance < states_fade_end + 30: col.a = 1.0
 			mat.albedo_color = col
 
 func _fade_cities() -> void:
@@ -115,33 +108,52 @@ func _fade_cities() -> void:
 	if not mat: return
 
 	var alpha := 1.0
-	if distance > states_fade_start:
-		alpha = 0.0
-	elif distance < states_fade_end:
-		alpha = 1.0
-	else:
-		alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
+	if distance > states_fade_start: alpha = 0.0
+	elif distance < states_fade_end: alpha = 1.0
+	else: alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
 
 	var col = mat.albedo_color
 	col.a = lerp(col.a, alpha, 0.4)
-	if distance < states_fade_end + 30:
-		col.a = 1.0
+	if distance < states_fade_end + 30: col.a = 1.0
 	mat.albedo_color = col
 
 func _try_select_state() -> void:
-	if not globe: return
+	if not globe:
+		print("[Click] Kein Globe gefunden!")
+		return
+
+	print("[Click] Linksklick erkannt – starte Raycast...")
 
 	var mouse_pos := get_viewport().get_mouse_position()
 	var from := project_ray_origin(mouse_pos)
-	var to := from + project_ray_normal(mouse_pos) * 3000
+	var to := from + project_ray_normal(mouse_pos) * 5000
 
 	var query := PhysicsRayQueryParameters3D.create(from, to)
 	var result := get_world_3d().direct_space_state.intersect_ray(query)
 
-	if result:
-		var hit_node = result.collider
-		if hit_node is MeshInstance3D and hit_node.name.begins_with("State_"):
-			var state_id := int(hit_node.name.split("_")[1])
+	if not result:
+		print("[Click] Raycast hat NICHTS getroffen.")
+		return
+
+	print("[Click] Raycast hat etwas getroffen!")
+
+	var hit_node = result.collider
+	if not hit_node:
+		print("[Click] Kein Collider gefunden.")
+		return
+
+	print("[Click] Getroffen: ", hit_node.name)
+
+	if hit_node is MeshInstance3D and hit_node.name.begins_with("State_"):
+		var node_name = hit_node.name
+		print("[Click] State-Node erkannt: ", node_name)
+
+		if node_name.begins_with("State_Unknown_"):
+			print("=== State ohne Daten ===")
+			print("Node-Name: ", node_name)
+			print("========================")
+		else:
+			var state_id := int(node_name.split("_")[1])
 			if globe.state_data.has(state_id):
 				var data = globe.state_data[state_id]
 				print("=== State angeklickt ===")
@@ -151,15 +163,15 @@ func _try_select_state() -> void:
 				print("Controller:", data.get("controller"))
 				print("Cities:    ", data.get("cities", []))
 				print("========================")
+			else:
+				print("[Click] State-ID ", state_id, " nicht in state_data gefunden.")
+	else:
+		print("[Click] Getroffenes Objekt ist kein State (", hit_node.name, ")")
 
 func _update_position() -> void:
 	if not target: return
 	var rad_y := deg_to_rad(yaw)
 	var rad_p := deg_to_rad(pitch)
-	var dir := Vector3(
-		cos(rad_p) * sin(rad_y),
-		sin(rad_p),
-		cos(rad_p) * cos(rad_y)
-	)
+	var dir := Vector3(cos(rad_p) * sin(rad_y), sin(rad_p), cos(rad_p) * cos(rad_y))
 	global_position = target.global_position + dir * distance
 	look_at(target.global_position, Vector3.UP)

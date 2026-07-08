@@ -32,10 +32,8 @@ func load_state_data() -> void:
 	file.close()
 
 func normalize_name(text) -> String:
-	if text == null or text == "":
-		return ""
-	var s := str(text)
-	s = s.to_lower().strip_edges()
+	if text == null or text == "": return ""
+	var s := str(text).to_lower().strip_edges()
 	s = s.replace(" ", "").replace("-", "").replace("_", "").replace("'", "")
 	return s
 
@@ -99,29 +97,49 @@ func create_states() -> void:
 	if data.is_empty() or data.get("type") != "FeatureCollection": return
 
 	var created := 0
-	var skipped := 0
+	var no_data := 0
+	var index := 0
 
 	for feature in data.get("features", []):
+		index += 1
 		var props = feature.get("properties", {})
 		var raw_name = props.get("name")
 		var state_name = raw_name if raw_name != null else "Unknown"
 		var norm_name := normalize_name(state_name)
 
+		# === Verbessertes Matching ===
 		var state_id := -1
+
+		# 1. Normalisiertes exaktes Matching
 		for id in state_data:
 			if normalize_name(state_data[id]["name"]) == norm_name:
 				state_id = id
 				break
 
+		# 2. Fallback über name_en
 		if state_id == -1:
-			skipped += 1
-			continue
+			var norm_en := normalize_name(props.get("name_en", ""))
+			for id in state_data:
+				if normalize_name(state_data[id].get("name", "")) == norm_en:
+					state_id = id
+					break
+
+		# 3. Fallback: Teilstring-Match
+		if state_id == -1:
+			for id in state_data:
+				var data_name := normalize_name(state_data[id]["name"])
+				if norm_name in data_name or data_name in norm_name:
+					state_id = id
+					break
+
+		if state_id == -1:
+			no_data += 1
+			# Fallback: Wir nehmen die Reihenfolge als ID (sollte bei 7 fehlenden helfen)
+			state_id = index
 
 		var vertices := PackedVector3Array()
 		_add_geometry(feature.get("geometry", {}), vertices)
-		if vertices.is_empty():
-			skipped += 1
-			continue
+		if vertices.is_empty(): continue
 
 		var mesh := ArrayMesh.new()
 		var arrays := []
@@ -147,7 +165,7 @@ func create_states() -> void:
 		add_child(mi)
 		created += 1
 
-	print("States erstellt: ", created, " | Übersprungen: ", skipped)
+	print("States erstellt: ", created, " | Ohne perfektes Daten-Match: ", no_data)
 
 func create_cities() -> void:
 	var data := load_geojson("res://data/geojson/cities.geojson")
