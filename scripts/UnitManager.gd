@@ -9,7 +9,7 @@ var active_entities: Array = []
 var selected_entity = null
 
 var nation_colors: Dictionary = {}
-var globe = null
+var globe: Globe = null
 
 func _ready() -> void:
 	_load_nation_colors()
@@ -85,7 +85,7 @@ func _spawn_ground_entity(entry: Dictionary) -> void:
 			var lat: float = float(pos_dict["lat"])
 			var lon: float = float(pos_dict["lon"])
 			var lift := 1.002
-			var radius := globe.earth_radius * lift + 8.0
+			var radius: float = globe.earth_radius * lift + 8.0
 			var world_pos := globe.lat_lon_to_vector3(lat, lon, radius)
 			entity.global_position = world_pos
 
