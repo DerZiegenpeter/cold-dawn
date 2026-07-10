@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://ce3gawa6yeau4" path="res://scripts/Globe.gd" id="1_rvslj"]
 [ext_resource type="Script" uid="uid://ikkbn265ijml" path="res://scripts/Camera.gd" id="2_0bbpv"]
+[ext_resource type="Script" uid="uid://dnl1nurvfg85n" path="res://scripts/Mapmodes/Political.gd" id="3_0bbpv"]
 
 [sub_resource type="Environment" id="Environment_0bj4a"]
 background_mode = 2
@@ -32,3 +33,8 @@ environment = SubResource("Environment_0bj4a")
 
 [node name="GlobeMesh" type="MeshInstance3D" parent="." unique_id=595785374]
 mesh = SubResource("SphereMesh_0bj4a")
+
+[node name="Mapmodes" type="Node3D" parent="." unique_id=1348235928]
+
+[node name="Political" type="Node3D" parent="Mapmodes" unique_id=59502791]
+script = ExtResource("3_0bbpv")
