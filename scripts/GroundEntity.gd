@@ -36,7 +36,7 @@ func _create_visual() -> void:
 	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
 	
 	mesh_instance.material_override = mat
-	mesh_instance.billboard_mode = GeometryInstance3D.BILLBOARD_ENABLED
+	mesh_instance.billboard_mode = GeometryInstance3D.BillboardMode.BILLBOARD_ENABLED
 
 	add_child(mesh_instance)
 
