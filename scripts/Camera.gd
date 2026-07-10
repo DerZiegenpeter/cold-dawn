@@ -173,8 +173,8 @@ func _is_on_land(world_pos: Vector3) -> bool:
 	for child in globe.get_children():
 		if child is MeshInstance3D:
 			if child.name.begins_with("State_") or child.name.begins_with("Political_"):
-				var dist := child.global_position.distance_to(world_pos)
-				if dist < 95.0:   # Schwellwert anpassen falls nötig
+				var dist: float = child.global_position.distance_to(world_pos)
+				if dist < 95.0:
 					return true
 	return false
 
@@ -254,8 +254,8 @@ func _try_select_state() -> void:
 			print("Controller:", data.get("controller"))
 			print("Cities:    ", data.get("cities", []))
 			print("========================")
-		else:
-			print("[Click] Keine Daten für State-ID ", state_id, " gefunden.")
+	else:
+		print("[Click] Keine Daten für State-ID ", state_id, " gefunden.")
 
 func _update_position() -> void:
 	if not target: return
