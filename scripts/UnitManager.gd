@@ -4,12 +4,13 @@ signal entity_selected(entity)
 signal entity_deselected()
 
 @export var ground_entity_scene: PackedScene = preload("res://scenes/GroundEntity.tscn")
+@export var air_entity_scene: PackedScene = preload("res://scenes/AirEntity.tscn")
 
 var active_entities: Array = []
 var selected_entity = null
 
 var nation_colors: Dictionary = {}
-var globe: Globe = null
+var globe = null
 
 func _ready() -> void:
 	_load_nation_colors()
@@ -62,35 +63,45 @@ func load_and_spawn_oob(oob_path: String = "res://data/oob.json") -> void:
 	var oob_data: Array = json.data if json.data is Array else []
 
 	for entry in oob_data:
-		_spawn_ground_entity(entry)
+		_spawn_entity(entry)
 
-	print("[UnitManager] ", active_entities.size(), " Ground Entities gespawnt")
+	print("[UnitManager] ", active_entities.size(), " Entities gespawnt")
 
-func _spawn_ground_entity(entry: Dictionary) -> void:
-	if not ground_entity_scene:
-		push_error("[UnitManager] GroundEntity Scene nicht gesetzt!")
+func _spawn_entity(entry: Dictionary) -> void:
+	var type: String = entry.get("type", "ground")
+
+	var entity_scene: PackedScene
+	if type == "air":
+		entity_scene = air_entity_scene
+	else:
+		entity_scene = ground_entity_scene
+
+	if not entity_scene:
+		push_error("[UnitManager] Entity Scene nicht gesetzt!")
 		return
 
-	var entity = ground_entity_scene.instantiate()
-	
+	var entity = entity_scene.instantiate()
+
 	var owner_code: String = entry.get("owner", "XXX")
 	var color = nation_colors.get(owner_code, Color(0.6, 0.6, 0.6))
-	
+
 	globe.add_child(entity)
-	
-	# Set initial position from lat/lon on globe surface (slightly lifted)
+
+	# Set initial position
 	if entry.has("position"):
 		var pos_dict: Dictionary = entry["position"]
 		if pos_dict.has("lat") and pos_dict.has("lon"):
 			var lat: float = float(pos_dict["lat"])
 			var lon: float = float(pos_dict["lon"])
 			var lift := 1.002
-			var radius: float = globe.earth_radius * lift + 8.0
+			var base_radius := globe.earth_radius * lift
+			var extra_height := 8.0 if type == "air" else 5.0
+			var radius := base_radius + extra_height
 			var world_pos := globe.lat_lon_to_vector3(lat, lon, radius)
 			entity.global_position = world_pos
 
 	entity.set_data(entry, color)
-	
+
 	active_entities.append(entity)
 
 func select_entity(entity) -> void:
@@ -130,9 +141,9 @@ func get_entity_at_mouse(mouse_pos: Vector2, camera: Camera3D) -> Variant:
 		if not is_instance_valid(entity):
 			continue
 		
-		var to_entity: Vector3 = (entity.global_position - from).normalized()
-		var angle := dir.dot(to_entity)
-		var dist := from.distance_to(entity.global_position)
+	var to_entity: Vector3 = (entity.global_position - from).normalized()
+	var angle := dir.dot(to_entity)
+	var dist := from.distance_to(entity.global_position)
 
 		if angle > 0.985 and dist < closest_dist:
 			closest_dist = dist
