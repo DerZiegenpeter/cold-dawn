@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://rujx0qugovko"]
+
+[ext_resource type="Script" uid="uid://dtfx7i3hqovlu" path="res://scripts/GroundEntity.gd" id="1_ikcom"]
+
+[node name="GroundEntity" type="Node3D" unique_id=1233187913]
+script = ExtResource("1_ikcom")

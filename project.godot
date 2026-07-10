@@ -14,6 +14,10 @@ config/name="Cold Dawn"
 run/main_scene="uid://dh8kpne5vj6mw"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
+[autoload]
+
+UnitManager="*uid://dy0epcoyqpb1x"
+
 [display]
 
 window/size/viewport_width=1920

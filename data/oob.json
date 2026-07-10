@@ -1,0 +1,22 @@
+[
+  {
+	"name": "1. Panzer-Division",
+	"owner": "DEU",
+	"position": { "lat": 52.52, "lon": 13.40 }
+  },
+  {
+	"name": "10. Panzer-Division",
+	"owner": "DEU",
+	"position": { "lat": 48.14, "lon": 11.58 }
+  },
+  {
+	"name": "1. Luftlande-Division",
+	"owner": "DEU",
+	"position": { "lat": 49.87, "lon": 8.65 }
+  },
+  {
+	"name": "21. Panzer-Brigade",
+	"owner": "DEU",
+	"position": { "lat": 53.55, "lon": 10.00 }
+  }
+]

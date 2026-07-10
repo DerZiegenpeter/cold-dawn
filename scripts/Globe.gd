@@ -19,6 +19,11 @@ func _ready() -> void:
 	create_coastlines()
 	create_states()
 	create_cities()
+	
+	# === Ground Entities (UnitManager) ===
+	UnitManager.initialize(self)
+	UnitManager.load_and_spawn_oob()
+	
 	print("Cold Dawn Globe ready!")
 
 func load_state_data() -> void:
@@ -28,7 +33,6 @@ func load_state_data() -> void:
 	var json := JSON.new()
 	if json.parse(file.get_as_text()) == OK:
 		for state in json.data:
-			# Use integer keys for reliable matching with index-based state_ids
 			var sid := int(state["id"])
 			state_data[sid] = state
 	file.close()
@@ -108,12 +112,9 @@ func create_states() -> void:
 		var raw_name = props.get("name")
 		var state_name = raw_name if raw_name != null else "Unknown"
 
-		# ID nach Reihenfolge vergeben (genau wie beim Generieren von states.json)
 		var state_id := index
 
-		# Versuche trotzdem Daten zu laden (für Owner/Controller/Cities)
 		if state_data.has(state_id):
-			# Daten gefunden → alles gut
 			pass
 		else:
 			no_data += 1
@@ -122,19 +123,13 @@ func create_states() -> void:
 		_add_geometry(feature.get("geometry", {}), vertices)
 		if vertices.is_empty(): continue
 
-		# === FIX: Compute center of this state's geometry for correct picking ===
-		# This allows Camera.gd's _try_select_state() to work properly
-		# (previously all State_ nodes were at position 0,0,0 making selection impossible)
 		var center := Vector3.ZERO
 		for v in vertices:
 			center += v
 		if vertices.size() > 0:
 			center /= float(vertices.size())
-			# Project back onto the sphere surface
 			center = center.normalized() * (earth_radius * SURFACE_LIFT)
 
-		# Create local vertices relative to center so the MeshInstance can be
-		# positioned at 'center' while geometry renders at correct absolute locations
 		var local_vertices := PackedVector3Array()
 		local_vertices.resize(vertices.size())
 		for i in range(vertices.size()):
@@ -149,7 +144,7 @@ func create_states() -> void:
 		var mi := MeshInstance3D.new()
 		mi.name = "State_" + str(state_id)
 		mi.mesh = mesh
-		mi.position = center   # <--- Critical fix: now global_position reflects state's location
+		mi.position = center
 
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = state_color
