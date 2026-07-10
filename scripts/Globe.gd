@@ -28,7 +28,9 @@ func load_state_data() -> void:
 	var json := JSON.new()
 	if json.parse(file.get_as_text()) == OK:
 		for state in json.data:
-			state_data[state["id"]] = state
+			# Use integer keys for reliable matching with index-based state_ids
+			var sid := int(state["id"])
+			state_data[sid] = state
 	file.close()
 
 func normalize_name(text) -> String:
@@ -120,15 +122,34 @@ func create_states() -> void:
 		_add_geometry(feature.get("geometry", {}), vertices)
 		if vertices.is_empty(): continue
 
+		# === FIX: Compute center of this state's geometry for correct picking ===
+		# This allows Camera.gd's _try_select_state() to work properly
+		# (previously all State_ nodes were at position 0,0,0 making selection impossible)
+		var center := Vector3.ZERO
+		for v in vertices:
+			center += v
+		if vertices.size() > 0:
+			center /= float(vertices.size())
+			# Project back onto the sphere surface
+			center = center.normalized() * (earth_radius * SURFACE_LIFT)
+
+		# Create local vertices relative to center so the MeshInstance can be
+		# positioned at 'center' while geometry renders at correct absolute locations
+		var local_vertices := PackedVector3Array()
+		local_vertices.resize(vertices.size())
+		for i in range(vertices.size()):
+			local_vertices[i] = vertices[i] - center
+
 		var mesh := ArrayMesh.new()
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)
-		arrays[Mesh.ARRAY_VERTEX] = vertices
+		arrays[Mesh.ARRAY_VERTEX] = local_vertices
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
 
 		var mi := MeshInstance3D.new()
 		mi.name = "State_" + str(state_id)
 		mi.mesh = mesh
+		mi.position = center   # <--- Critical fix: now global_position reflects state's location
 
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = state_color
