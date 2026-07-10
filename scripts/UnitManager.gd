@@ -95,7 +95,7 @@ func _spawn_entity(entry: Dictionary) -> void:
 			var lon: float = float(pos_dict["lon"])
 			var lift: float = 1.002
 			var base_radius: float = globe.earth_radius * lift
-			var extra_height: float = 8.0 if type == "air" else 5.0
+			var extra_height: float = 8.0 if type == "air" else 2.8   # Ground niedriger
 			var radius: float = base_radius + extra_height
 			var world_pos: Vector3 = globe.lat_lon_to_vector3(lat, lon, radius)
 			entity.global_position = world_pos
