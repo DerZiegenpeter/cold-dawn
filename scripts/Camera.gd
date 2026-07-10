@@ -254,8 +254,8 @@ func _try_select_state() -> void:
 			print("Controller:", data.get("controller"))
 			print("Cities:    ", data.get("cities", []))
 			print("========================")
-	else:
-		print("[Click] Keine Daten für State-ID ", state_id, " gefunden.")
+		else:
+			print("[Click] Keine Daten für State-ID ", state_id, " gefunden.")
 
 func _update_position() -> void:
 	if not target: return
