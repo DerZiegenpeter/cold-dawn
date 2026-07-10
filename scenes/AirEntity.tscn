@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://airentity001"]
+[gd_scene format=3 uid="uid://irentity001"]
 
 [ext_resource type="Script" path="res://scripts/AirEntity.gd" id="1_air"]
 
