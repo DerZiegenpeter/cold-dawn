@@ -2,7 +2,8 @@ extends Node3D
 class_name GroundEntity
 
 ## Ground Entity (z.B. Divisionen, Einheiten)
-## - Rechteckiges Billboard-Quad auf der Globus-Oberfläche
+## - Rechteckiges Quad auf der Globus-Oberfläche
+## - Dreht sich immer zur Kamera (_process look_at)
 ## - Wird per Left-Click ausgewählt (über UnitManager)
 ## - Wird per Right-Click auf den Globus bewegt
 
@@ -36,9 +37,17 @@ func _create_visual() -> void:
 	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
 	
 	mesh_instance.material_override = mat
-	mesh_instance.billboard_mode = 1  # BILLBOARD_ENABLED (GeometryInstance3D.BillboardMode.BILLBOARD_ENABLED)
+	# billboard_mode entfernt wegen Type-Enum-Problemen in dieser Godot-Version
+	# Stattdessen manuelles Camera-Facing im _process
 
 	add_child(mesh_instance)
+
+func _process(_delta: float) -> void:
+	if mesh_instance == null or not is_instance_valid(mesh_instance):
+		return
+	var camera := get_viewport().get_camera_3d()
+	if camera:
+		mesh_instance.look_at(camera.global_position, Vector3.UP, true)
 
 func set_data(entry: Dictionary, color: Color) -> void:
 	data = entry
