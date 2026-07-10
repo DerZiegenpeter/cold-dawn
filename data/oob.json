@@ -2,21 +2,37 @@
   {
 	"name": "1. Panzer-Division",
 	"owner": "DEU",
+	"type": "ground",
 	"position": { "lat": 52.52, "lon": 13.40 }
   },
   {
 	"name": "10. Panzer-Division",
 	"owner": "DEU",
+	"type": "ground",
 	"position": { "lat": 48.14, "lon": 11.58 }
   },
   {
 	"name": "1. Luftlande-Division",
 	"owner": "DEU",
+	"type": "ground",
 	"position": { "lat": 49.87, "lon": 8.65 }
   },
   {
 	"name": "21. Panzer-Brigade",
 	"owner": "DEU",
+	"type": "ground",
 	"position": { "lat": 53.55, "lon": 10.00 }
+  },
+  {
+	"name": "1. Jagdgeschwader 71",
+	"owner": "DEU",
+	"type": "air",
+	"position": { "lat": 52.0, "lon": 10.0 }
+  },
+  {
+	"name": "2. Jagdgeschwader 74",
+	"owner": "DEU",
+	"type": "air",
+	"position": { "lat": 48.5, "lon": 11.0 }
   }
 ]
