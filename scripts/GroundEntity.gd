@@ -6,7 +6,7 @@ class_name GroundEntity
 ## - Klein + gleichmäßige Seiten
 ## - Steht exakt auf der Globus-Oberfläche
 ## - Bewegung entlang Großkreis (bleibt auf der Kugel)
-## - Konstante Geschwindigkeit, kein Easing
+## - Konstante langsame Geschwindigkeit
 ## - Keine Skalierung bei Selektion
 
 signal moved(new_pos: Vector3)
@@ -36,7 +36,7 @@ func _create_visual() -> void:
 	var vertices := PackedVector3Array()
 	var indices := PackedInt32Array()
 
-	var s := 3.0   # Seitenlänge (klein + gleichmäßig)
+	var s := 2.2   # Seitenlänge (kleiner gemacht)
 
 	# 8 Eckpunkte eines Würfels
 	vertices.push_back(Vector3(-s/2, -s/2, -s/2))
@@ -50,9 +50,9 @@ func _create_visual() -> void:
 	vertices.push_back(Vector3(-s/2,  s/2,  s/2))
 
 	# 12 Kanten
-	indices.append_array([0,1, 1,2, 2,3, 3,0])   # unten
-	indices.append_array([4,5, 5,6, 6,7, 7,4])   # oben
-	indices.append_array([0,4, 1,5, 2,6, 3,7])   # vertikal
+	indices.append_array([0,1, 1,2, 2,3, 3,0])
+	indices.append_array([4,5, 5,6, 6,7, 7,4])
+	indices.append_array([0,4, 1,5, 2,6, 3,7])
 
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_INDEX] = indices
@@ -87,8 +87,8 @@ func _process(delta: float) -> void:
 		_orient_to_surface()
 		return
 
-	# Bewegung entlang Großkreis (bleibt auf der Kugeloberfläche)
-	var angular_speed: float = 0.75
+	# Bewegung entlang Großkreis mit konstanter (langsamer) Geschwindigkeit
+	var angular_speed: float = 0.38   # Radiant pro Sekunde (deutlich langsamer)
 	var t: float = clamp(angular_speed * delta / angle, 0.0, 1.0)
 	var new_dir: Vector3 = current_dir.slerp(target_dir, t)
 
@@ -121,8 +121,9 @@ func set_selected(selected: bool) -> void:
 	_update_visual()
 
 func move_to(world_pos: Vector3) -> void:
-	var s: float = 3.0
-	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 0.6)
+	var s: float = 2.2
+	# Deutlich näher an der Oberfläche (Unterseite fast auf dem Globus)
+	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 0.45 + 0.25)
 	target_pos = lifted
 
 func update_fade(alpha: float) -> void:
