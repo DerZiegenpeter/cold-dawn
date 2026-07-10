@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://irentity001"]
 
-[ext_resource type="Script" path="res://scripts/AirEntity.gd" id="1_air"]
+[ext_resource type="Script" uid="uid://m14wk5kgii61" path="res://scripts/AirEntity.gd" id="1_air"]
 
-[node name="AirEntity" type="Node3D"]
+[node name="AirEntity" type="Node3D" unique_id=1157193761]
 script = ExtResource("1_air")
