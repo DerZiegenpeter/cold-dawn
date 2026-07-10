@@ -1,12 +1,12 @@
 extends Node3D
 class_name GroundEntity
 
-## Ground Entity (z.B. Divisionen, Einheiten)
-## - 3D Rechteck (stehend auf der Globus-Oberfläche)
-## - Nur Kantenlinien sichtbar (Wireframe-Style)
-## - Immer fix zur Oberfläche ausgerichtet (kein Camera-Facing)
-## - Bewegt sich smooth zum Ziel (lerp)
-## - Kleiner als vorher
+## Ground Entity
+## - Perfekter Würfel (Wireframe mit nur Kanten)
+## - Immer gleich lange Seiten
+## - Steht fix auf der Globus-Oberfläche (kein Camera-Facing)
+## - Sehr einfache konstante Geschwindigkeit (kein Anfahren/Abbremsen)
+## - Klein
 
 signal moved(new_pos: Vector3)
 
@@ -27,7 +27,7 @@ func _create_visual() -> void:
 	mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = "Visual"
 
-	# === 3D Wireframe Rechteck (nur Kanten) ===
+	# === Perfekter Wireframe-Würfel (nur Kanten sichtbar) ===
 	var mesh := ArrayMesh.new()
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
@@ -35,29 +35,25 @@ func _create_visual() -> void:
 	var vertices := PackedVector3Array()
 	var indices := PackedInt32Array()
 
-	# Kleines stehendes Rechteck (breite x höhe)
-	var width := 5.0
-	var height := 8.0
-	var thickness := 0.3
+	var s := 3.5   # Seitenlänge des Würfels (klein + gleichmäßig)
 
-	# Vorderes Rechteck (4 Ecken)
-	vertices.push_back(Vector3(-width/2, 0, -thickness/2))
-	vertices.push_back(Vector3( width/2, 0, -thickness/2))
-	vertices.push_back(Vector3( width/2, height, -thickness/2))
-	vertices.push_back(Vector3(-width/2, height, -thickness/2))
+	# 8 Eckpunkte eines Würfels (zentriert bei 0,0,0)
+	vertices.push_back(Vector3(-s/2, -s/2, -s/2))
+	vertices.push_back(Vector3( s/2, -s/2, -s/2))
+	vertices.push_back(Vector3( s/2,  s/2, -s/2))
+	vertices.push_back(Vector3(-s/2,  s/2, -s/2))
 
-	# Hinteres Rechteck (für leichten 3D-Effekt)
-	vertices.push_back(Vector3(-width/2, 0,  thickness/2))
-	vertices.push_back(Vector3( width/2, 0,  thickness/2))
-	vertices.push_back(Vector3( width/2, height,  thickness/2))
-	vertices.push_back(Vector3(-width/2, height,  thickness/2))
+	vertices.push_back(Vector3(-s/2, -s/2,  s/2))
+	vertices.push_back(Vector3( s/2, -s/2,  s/2))
+	vertices.push_back(Vector3( s/2,  s/2,  s/2))
+	vertices.push_back(Vector3(-s/2,  s/2,  s/2))
 
-	# Linien-Indizes (vorne + hinten + verbindungen)
-	# Vorne
+	# 12 Kanten (Linien)
+	# Unten
 	indices.append_array([0,1, 1,2, 2,3, 3,0])
-	# Hinten
+	# Oben
 	indices.append_array([4,5, 5,6, 6,7, 7,4])
-	# Verbindungen
+	# Vertikale Kanten
 	indices.append_array([0,4, 1,5, 2,6, 3,7])
 
 	arrays[Mesh.ARRAY_VERTEX] = vertices
@@ -72,36 +68,39 @@ func _create_visual() -> void:
 	mat.albedo_color = nation_color
 	mat.emission_enabled = true
 	mat.emission = nation_color
-	mat.emission_energy_multiplier = 0.8
+	mat.emission_energy_multiplier = 1.2
 	mat.render_priority = 30
 
 	mesh_instance.material_override = mat
 
 	add_child(mesh_instance)
 
+	# Wichtig: Bei Spawn direkt korrekt ausrichten
+	_orient_to_surface()
+
 func _process(delta: float) -> void:
-	# Smooth movement zum Ziel
-	if target_pos != Vector3.ZERO:
-		var dist := global_position.distance_to(target_pos)
-		if dist > 0.3:
-			global_position = global_position.lerp(target_pos, clamp(6.0 * delta, 0.0, 1.0))
-			_orient_to_surface()
-		else:
-			target_pos = Vector3.ZERO
+	if target_pos == Vector3.ZERO:
+		return
+
+	var dist := global_position.distance_to(target_pos)
+	if dist < 0.2:
+		global_position = target_pos
+		target_pos = Vector3.ZERO
+		_orient_to_surface()
+		return
+
+	# Sehr einfache konstante Geschwindigkeit (kein Lerp-Easing)
+	var speed := 18.0   # Einheiten pro Sekunde (langsam aber direkt)
+	var dir := (target_pos - global_position).normalized()
+	global_position += dir * speed * delta
+	_orient_to_surface()
 
 func _orient_to_surface() -> void:
 	if mesh_instance == null:
 		return
 	var normal := global_position.normalized()
-	# Ausrichtung: Rechteck steht "aufrecht" auf der Globus-Oberfläche
-	var basis := Basis()
-	basis.y = normal
-	var right := normal.cross(Vector3.UP).normalized()
-	if right.length_squared() < 0.01:
-		right = normal.cross(Vector3.RIGHT).normalized()
-	basis.x = right
-	basis.z = normal.cross(right).normalized()
-	mesh_instance.transform.basis = basis
+	# Robuste Ausrichtung: Ein Würfel steht "auf" der Oberfläche
+	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
 
 func set_data(entry: Dictionary, color: Color) -> void:
 	data = entry
@@ -117,10 +116,8 @@ func set_selected(selected: bool) -> void:
 	_update_visual()
 
 func move_to(world_pos: Vector3) -> void:
-	# Zielposition leicht über der Oberfläche
-	var lifted := world_pos.normalized() * (world_pos.length() + 5.0)
+	var lifted := world_pos.normalized() * (world_pos.length() + 4.0)
 	target_pos = lifted
-	# Optional: Hier später Land-Check einbauen (nur auf States)
 
 func update_fade(alpha: float) -> void:
 	if mesh_instance == null:
@@ -143,9 +140,9 @@ func _update_visual() -> void:
 
 	if is_selected:
 		mat.albedo_color = nation_color.lightened(0.5)
-		mat.emission_energy_multiplier = 2.0
-		mesh_instance.scale = Vector3(1.3, 1.3, 1.3)
+		mat.emission_energy_multiplier = 2.5
+		mesh_instance.scale = Vector3(1.4, 1.4, 1.4)
 	else:
 		mat.albedo_color = nation_color
-		mat.emission_energy_multiplier = 0.8
+		mat.emission_energy_multiplier = 1.2
 		mesh_instance.scale = Vector3.ONE
