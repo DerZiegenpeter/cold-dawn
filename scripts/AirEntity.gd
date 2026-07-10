@@ -2,9 +2,9 @@ extends Node3D
 class_name AirEntity
 
 ## Air Entity
-## - Wireframe Raute / Diamant (gedrehter Würfel)
-## - Kann überall hin (auch über Wasser)
-## - Schwebt etwas höher über dem Globus
+## - Wireframe-Raute / Diamant (Kante nach oben)
+## - Schwebt höher
+## - Kann überall hin
 
 signal moved(new_pos: Vector3)
 
@@ -25,7 +25,6 @@ func _create_visual() -> void:
 	mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = "Visual"
 
-	# === Wireframe-Würfel als Raute ===
 	var mesh := ArrayMesh.new()
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
@@ -33,9 +32,8 @@ func _create_visual() -> void:
 	var vertices := PackedVector3Array()
 	var indices := PackedInt32Array()
 
-	var s := 2.4   # Etwas größer als Ground für bessere Sichtbarkeit
+	var s := 2.4
 
-	# 8 Eckpunkte eines Würfels
 	vertices.push_back(Vector3(-s/2, -s/2, -s/2))
 	vertices.push_back(Vector3( s/2, -s/2, -s/2))
 	vertices.push_back(Vector3( s/2,  s/2, -s/2))
@@ -46,7 +44,6 @@ func _create_visual() -> void:
 	vertices.push_back(Vector3( s/2,  s/2,  s/2))
 	vertices.push_back(Vector3(-s/2,  s/2,  s/2))
 
-	# 12 Kanten
 	indices.append_array([0,1, 1,2, 2,3, 3,0])
 	indices.append_array([4,5, 5,6, 6,7, 7,4])
 	indices.append_array([0,4, 1,5, 2,6, 3,7])
@@ -68,11 +65,23 @@ func _create_visual() -> void:
 
 	mesh_instance.material_override = mat
 
-	# Raute-Form: Kante nach oben (Würfel drehen)
-	mesh_instance.rotate_x(deg_to_rad(45))
-	mesh_instance.rotate_z(deg_to_rad(45))
-
 	add_child(mesh_instance)
+
+func _orient_to_surface() -> void:
+	if mesh_instance == null:
+		return
+	if global_position.length_squared() < 1.0:
+		return
+	var normal: Vector3 = global_position.normalized()
+	if normal.length_squared() < 0.0001:
+		return
+
+	# Basis normal ausrichten
+	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
+
+	# Zusätzliche Drehung für Raute-Form (Kante nach oben)
+	mesh_instance.rotate_object_local(Vector3.RIGHT, deg_to_rad(45))
+	mesh_instance.rotate_object_local(Vector3.FORWARD, deg_to_rad(45))
 
 func _process(delta: float) -> void:
 	if target_pos == Vector3.ZERO:
@@ -88,23 +97,14 @@ func _process(delta: float) -> void:
 		_orient_to_surface()
 		return
 
-	var angular_speed: float = 0.45
+	# Langsame Bewegung
+	var angular_speed: float = 0.25
 	var t: float = clamp(angular_speed * delta / angle, 0.0, 1.0)
 	var new_dir: Vector3 = current_dir.slerp(target_dir, t)
 
 	var radius: float = global_position.length()
 	global_position = new_dir * radius
 	_orient_to_surface()
-
-func _orient_to_surface() -> void:
-	if mesh_instance == null:
-		return
-	if global_position.length_squared() < 1.0:
-		return
-	var normal: Vector3 = global_position.normalized()
-	if normal.length_squared() < 0.0001:
-		return
-	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
 
 func set_data(entry: Dictionary, color: Color) -> void:
 	data = entry
@@ -122,8 +122,8 @@ func set_selected(selected: bool) -> void:
 
 func move_to(world_pos: Vector3) -> void:
 	var s: float = 2.4
-	# Air Entities schweben höher
-	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 1.8)
+	# Air Entities schweben deutlich höher
+	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 1.6)
 	target_pos = lifted
 
 func update_fade(alpha: float) -> void:
