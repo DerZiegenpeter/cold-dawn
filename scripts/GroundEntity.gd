@@ -77,9 +77,9 @@ func _process(delta: float) -> void:
 	if target_pos == Vector3.ZERO:
 		return
 
-	var current_dir := global_position.normalized()
-	var target_dir := target_pos.normalized()
-	var angle := current_dir.angle_to(target_dir)
+	var current_dir: Vector3 = global_position.normalized()
+	var target_dir: Vector3 = target_pos.normalized()
+	var angle: float = current_dir.angle_to(target_dir)
 
 	if angle < 0.012:
 		global_position = target_pos
@@ -88,11 +88,11 @@ func _process(delta: float) -> void:
 		return
 
 	# Bewegung entlang Großkreis (bleibt auf der Kugeloberfläche)
-	var angular_speed := 0.75   # Radiant pro Sekunde (langsam + konstant)
-	var t := clamp(angular_speed * delta / angle, 0.0, 1.0)
-	var new_dir := current_dir.slerp(target_dir, t)
+	var angular_speed: float = 0.75
+	var t: float = clamp(angular_speed * delta / angle, 0.0, 1.0)
+	var new_dir: Vector3 = current_dir.slerp(target_dir, t)
 
-	var radius := global_position.length()
+	var radius: float = global_position.length()
 	global_position = new_dir * radius
 	_orient_to_surface()
 
@@ -100,8 +100,8 @@ func _orient_to_surface() -> void:
 	if mesh_instance == null:
 		return
 	if global_position.length_squared() < 1.0:
-		return   # noch keine gültige Position
-	var normal := global_position.normalized()
+		return
+	var normal: Vector3 = global_position.normalized()
 	if normal.length_squared() < 0.0001:
 		return
 	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
@@ -114,16 +114,15 @@ func set_data(entry: Dictionary, color: Color) -> void:
 		_create_visual()
 
 	_update_visual()
-	_orient_to_surface()   # jetzt Position bekannt → korrekt ausrichten
+	_orient_to_surface()
 
 func set_selected(selected: bool) -> void:
 	is_selected = selected
 	_update_visual()
 
 func move_to(world_pos: Vector3) -> void:
-	# Würfel soll mit Unterseite auf der Oberfläche liegen
-	var s := 3.0
-	var lifted := world_pos.normalized() * (world_pos.length() + s * 0.6)
+	var s: float = 3.0
+	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 0.6)
 	target_pos = lifted
 
 func update_fade(alpha: float) -> void:
@@ -148,7 +147,6 @@ func _update_visual() -> void:
 	if is_selected:
 		mat.albedo_color = nation_color.lightened(0.5)
 		mat.emission_energy_multiplier = 2.5
-		# Keine Skalierung mehr bei Selektion
 	else:
 		mat.albedo_color = nation_color
 		mat.emission_energy_multiplier = 1.2
