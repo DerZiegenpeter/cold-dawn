@@ -32,6 +32,7 @@ transform = Transform3D(1, 0, 0, 0, 0.8660254, 0.5, 0, -0.5, 0.8660254, 0, 10, 5
 environment = SubResource("Environment_0bj4a")
 
 [node name="GlobeMesh" type="MeshInstance3D" parent="." unique_id=595785374]
+visible = false
 mesh = SubResource("SphereMesh_0bj4a")
 
 [node name="Mapmodes" type="Node3D" parent="." unique_id=1348235928]
