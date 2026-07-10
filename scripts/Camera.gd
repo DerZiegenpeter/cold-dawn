@@ -143,10 +143,10 @@ func _handle_left_click() -> void:
 	if entity:
 		UnitManager.select_entity(entity)
 		return
-	
+
 	# Normaler State-Klick
 	_try_select_state()
-	
+
 	# Wenn nichts getroffen wurde → deselektieren
 	if not _did_hit_anything(mouse_pos):
 		UnitManager.deselect()
@@ -154,14 +154,29 @@ func _handle_left_click() -> void:
 func _handle_right_click() -> void:
 	if not UnitManager.selected_entity:
 		return
-	
+
 	var mouse_pos := get_viewport().get_mouse_position()
 	var from := project_ray_origin(mouse_pos)
 	var dir := project_ray_normal(mouse_pos)
-	
+
 	var hit_pos := _raycast_to_globe_sphere(from, dir)
 	if hit_pos != Vector3.ZERO:
-		UnitManager.move_selected_to(hit_pos)
+		if _is_on_land(hit_pos):
+			UnitManager.move_selected_to(hit_pos)
+		else:
+			print("[Movement] Nur auf Land/States erlaubt!")
+
+func _is_on_land(world_pos: Vector3) -> bool:
+	if not globe:
+		return true
+
+	for child in globe.get_children():
+		if child is MeshInstance3D:
+			if child.name.begins_with("State_") or child.name.begins_with("Political_"):
+				var dist := child.global_position.distance_to(world_pos)
+				if dist < 95.0:   # Schwellwert anpassen falls nötig
+					return true
+	return false
 
 func _did_hit_anything(mouse_pos: Vector2) -> bool:
 	var entity = UnitManager.get_entity_at_mouse(mouse_pos, self)
@@ -174,22 +189,22 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 		return Vector3.ZERO
 	var radius := globe.earth_radius * 1.002
 	var center := globe.global_position
-	
+
 	var oc := from - center
 	var a := dir.dot(dir)
 	var b := 2.0 * oc.dot(dir)
 	var c := oc.dot(oc) - radius * radius
 	var discriminant := b * b - 4 * a * c
-	
+
 	if discriminant < 0:
 		return Vector3.ZERO
-	
+
 	var t := (-b - sqrt(discriminant)) / (2.0 * a)
 	if t < 0:
 		t = (-b + sqrt(discriminant)) / (2.0 * a)
 	if t < 0:
 		return Vector3.ZERO
-	
+
 	return from + dir * t
 
 func _try_select_state() -> void:
