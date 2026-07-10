@@ -5,9 +5,7 @@ class_name GroundEntity
 ## - Perfekter Wireframe-Würfel (nur Kanten)
 ## - Klein + gleichmäßige Seiten
 ## - Steht exakt auf der Globus-Oberfläche
-## - Bewegung entlang Großkreis (bleibt auf der Kugel)
-## - Konstante langsame Geschwindigkeit
-## - Keine Skalierung bei Selektion
+## - Bewegung entlang Großkreis (langsam)
 
 signal moved(new_pos: Vector3)
 
@@ -28,7 +26,6 @@ func _create_visual() -> void:
 	mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = "Visual"
 
-	# === Perfekter Wireframe-Würfel ===
 	var mesh := ArrayMesh.new()
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
@@ -36,9 +33,8 @@ func _create_visual() -> void:
 	var vertices := PackedVector3Array()
 	var indices := PackedInt32Array()
 
-	var s := 2.2   # Seitenlänge (kleiner gemacht)
+	var s := 2.2
 
-	# 8 Eckpunkte eines Würfels
 	vertices.push_back(Vector3(-s/2, -s/2, -s/2))
 	vertices.push_back(Vector3( s/2, -s/2, -s/2))
 	vertices.push_back(Vector3( s/2,  s/2, -s/2))
@@ -49,7 +45,6 @@ func _create_visual() -> void:
 	vertices.push_back(Vector3( s/2,  s/2,  s/2))
 	vertices.push_back(Vector3(-s/2,  s/2,  s/2))
 
-	# 12 Kanten
 	indices.append_array([0,1, 1,2, 2,3, 3,0])
 	indices.append_array([4,5, 5,6, 6,7, 7,4])
 	indices.append_array([0,4, 1,5, 2,6, 3,7])
@@ -87,8 +82,8 @@ func _process(delta: float) -> void:
 		_orient_to_surface()
 		return
 
-	# Bewegung entlang Großkreis mit konstanter (langsamer) Geschwindigkeit
-	var angular_speed: float = 0.38   # Radiant pro Sekunde (deutlich langsamer)
+	# Langsame konstante Geschwindigkeit
+	var angular_speed: float = 0.25
 	var t: float = clamp(angular_speed * delta / angle, 0.0, 1.0)
 	var new_dir: Vector3 = current_dir.slerp(target_dir, t)
 
@@ -122,8 +117,8 @@ func set_selected(selected: bool) -> void:
 
 func move_to(world_pos: Vector3) -> void:
 	var s: float = 2.2
-	# Deutlich näher an der Oberfläche (Unterseite fast auf dem Globus)
-	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 0.45 + 0.25)
+	# Sehr nah an der Oberfläche (fast auf dem Boden)
+	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 0.42 + 0.15)
 	target_pos = lifted
 
 func update_fade(alpha: float) -> void:
