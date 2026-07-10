@@ -141,9 +141,9 @@ func get_entity_at_mouse(mouse_pos: Vector2, camera: Camera3D) -> Variant:
 		if not is_instance_valid(entity):
 			continue
 		
-	var to_entity: Vector3 = (entity.global_position - from).normalized()
-	var angle := dir.dot(to_entity)
-	var dist := from.distance_to(entity.global_position)
+		var to_entity: Vector3 = (entity.global_position - from).normalized()
+		var angle := dir.dot(to_entity)
+		var dist := from.distance_to(entity.global_position)
 
 		if angle > 0.985 and dist < closest_dist:
 			closest_dist = dist
