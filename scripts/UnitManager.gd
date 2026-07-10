@@ -10,7 +10,7 @@ var active_entities: Array = []
 var selected_entity = null
 
 var nation_colors: Dictionary = {}
-var globe = null
+var globe: Globe = null
 
 func _ready() -> void:
 	_load_nation_colors()
@@ -93,11 +93,11 @@ func _spawn_entity(entry: Dictionary) -> void:
 		if pos_dict.has("lat") and pos_dict.has("lon"):
 			var lat: float = float(pos_dict["lat"])
 			var lon: float = float(pos_dict["lon"])
-			var lift := 1.002
-			var base_radius := globe.earth_radius * lift
-			var extra_height := 8.0 if type == "air" else 5.0
-			var radius := base_radius + extra_height
-			var world_pos := globe.lat_lon_to_vector3(lat, lon, radius)
+			var lift: float = 1.002
+			var base_radius: float = globe.earth_radius * lift
+			var extra_height: float = 8.0 if type == "air" else 5.0
+			var radius: float = base_radius + extra_height
+			var world_pos: Vector3 = globe.lat_lon_to_vector3(lat, lon, radius)
 			entity.global_position = world_pos
 
 	entity.set_data(entry, color)
@@ -142,8 +142,8 @@ func get_entity_at_mouse(mouse_pos: Vector2, camera: Camera3D) -> Variant:
 			continue
 		
 		var to_entity: Vector3 = (entity.global_position - from).normalized()
-		var angle := dir.dot(to_entity)
-		var dist := from.distance_to(entity.global_position)
+		var angle: float = dir.dot(to_entity)
+		var dist: float = from.distance_to(entity.global_position)
 
 		if angle > 0.985 and dist < closest_dist:
 			closest_dist = dist
@@ -152,7 +152,7 @@ func get_entity_at_mouse(mouse_pos: Vector2, camera: Camera3D) -> Variant:
 	return closest
 
 func update_fade_for_all(distance: float) -> void:
-	var alpha := 1.0
+	var alpha: float = 1.0
 	if distance > 1200:
 		alpha = 0.0
 	elif distance < 700:
