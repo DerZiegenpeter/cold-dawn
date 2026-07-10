@@ -1,69 +1,188 @@
 extends Node3D
-class_name Ownership
+class_name PoliticalMap
 
-## Political Map Mode (Ownership) - FIXED v2
-## Die gelben DEU-Füllungen sind JETZT IMMER sichtbar,
-## auch wenn nur Coastlines zu sehen sind (weit herausgezoomt).
-## Kein Fading für die Political-Füllungen!
+## Politische Weltkarte (Performance + gute Kugelkrümmung)
+## - Ein Mesh pro Land
+## - Alles auf exakt derselben Höhe (1.002)
+## - Korrekte Unterteilung bei großen Ländern
 
 @export var globe_path: NodePath = ^"../../Globe"
-@export var target_country: String = "DEU"
-@export var fill_color: Color = Color(1.0, 0.88, 0.25, 0.55)  # Etwas satteres Gelb + höhere Alpha
-@export var fill_radius_multiplier: float = 1.0015
-@export var render_priority: int = 15          # Höher als Coastlines (10) und States (8) → immer oben
-@export var emission_energy: float = 0.8
+@export var fill_radius_multiplier: float = 1.002
+@export var render_priority: int = 15
+@export var emission_energy: float = 0.5
+@export var base_subdivision: int = 1          # Basis-Unterteilung
 
 var _globe: Globe
-var _fill_nodes: Array[MeshInstance3D] = []
+var _country_meshes: Dictionary = {}
 
 func _ready() -> void:
-	print("=== Political (Ownership) _ready() gestartet ===")
+	print("=== PoliticalMap gestartet ===")
 	_globe = get_node_or_null(globe_path)
-	
 	if not _globe:
-		push_error("❌ Political: Globe NICHT gefunden!")
+		push_error("PoliticalMap: Globe nicht gefunden!")
 		return
 	
-	print("✅ Political: Globe gefunden")
-	apply_country_highlight(target_country, fill_color)
+	_create_batched_political_map()
 
-func apply_country_highlight(country_code: String, color: Color) -> void:
-	clear_highlights()
-	
-	if not _globe: return
+func _create_batched_political_map() -> void:
+	clear_map()
 	
 	var nations := _load_json_array("res://data/nations.json")
-	if nations.is_empty(): return
-	
-	var state_ids: Array[int] = []
-	for nation in nations:
-		if str(nation.get("id", "")) == country_code:
-			for sid in nation.get("states", []):
-				state_ids.append(int(sid))
-			break
-	
-	if state_ids.is_empty(): return
+	if nations.is_empty():
+		push_warning("PoliticalMap: nations.json nicht gefunden!")
+		return
 	
 	var geo_data := _load_json_dict("res://data/geojson/states.geojson")
-	if geo_data.is_empty(): return
+	if geo_data.is_empty():
+		return
+	
+	# state_id → country_code Mapping
+	var state_to_country: Dictionary = {}
+	for nation in nations:
+		var code := str(nation.get("id", ""))
+		if code == "": continue
+		for sid in nation.get("states", []):
+			state_to_country[int(sid)] = code
+	
+	# States pro Land sammeln
+	var country_geometries: Dictionary = {}
+	for nation in nations:
+		var code := str(nation.get("id", ""))
+		if code != "":
+			country_geometries[code] = []
 	
 	var features: Array = geo_data.get("features", [])
 	var index := 0
-	var created := 0
 	
 	for feature in features:
 		index += 1
-		if index in state_ids:
-			_create_filled_mesh_for_state(feature.get("geometry", {}), color, index, country_code)
+		var state_id := index
+		var owner_code: String = state_to_country.get(state_id, "")
+		
+		if owner_code != "" and country_geometries.has(owner_code):
+			var rings := _extract_outer_rings(feature.get("geometry", {}))
+			country_geometries[owner_code].append_array(rings)
+	
+	# Pro Land ein Mesh erstellen
+	var created := 0
+	
+	for nation in nations:
+		var code := str(nation.get("id", ""))
+		if code == "" or not country_geometries.has(code):
+			continue
+		
+		var rings: Array = country_geometries[code]
+		if rings.is_empty():
+			continue
+		
+		var color := _get_color_from_nation(nation)
+		var mi := _create_country_mesh(rings, color, code)
+		
+		if mi:
+			_globe.add_child(mi)
+			_country_meshes[code] = mi
 			created += 1
 	
-	print("✅ Political: ", country_code, " → ", created, " States als dauerhaft sichtbare Füllung erstellt")
+	print("✅ PoliticalMap: ", created, " Länder als Meshes erstellt")
 
-func clear_highlights() -> void:
-	for mi in _fill_nodes:
+func _get_color_from_nation(nation: Dictionary) -> Color:
+	if nation.has("color") and nation["color"] is Array and nation["color"].size() >= 3:
+		var c = nation["color"]
+		return Color(float(c[0]), float(c[1]), float(c[2]), 0.55)
+	return Color(0.6, 0.6, 0.6, 0.4)
+
+func _create_country_mesh(rings: Array, color: Color, country_code: String) -> MeshInstance3D:
+	var mesh_verts := PackedVector3Array()
+	var mesh_indices := PackedInt32Array()
+	var vcount := 0
+	var radius := _globe.earth_radius * fill_radius_multiplier
+	
+	for ring in rings:
+		if ring.size() < 3: continue
+		
+		var tris := Geometry2D.triangulate_polygon(ring)
+		if tris.is_empty(): continue
+		
+		for i in range(0, tris.size(), 3):
+			var tri_verts: Array[Vector3] = []
+			for j in 3:
+				var pidx := tris[i + j]
+				var pt: Vector2 = ring[pidx]
+				var v3 := _lat_lon_to_vector3(pt.y, pt.x, radius)
+				tri_verts.append(v3)
+			
+			# Unterteilung je nach Polygon-Größe
+			var level := base_subdivision
+			if ring.size() > 80:
+				level = base_subdivision + 1
+			
+			if level > 0:
+				var subdivided := _subdivide_triangle(tri_verts, level, radius)
+				for sv in subdivided:
+					mesh_verts.append(sv)
+					mesh_indices.append(vcount)
+					vcount += 1
+			else:
+				for v in tri_verts:
+					mesh_verts.append(v)
+					mesh_indices.append(vcount)
+					vcount += 1
+	
+	if mesh_verts.is_empty():
+		return null
+	
+	var mesh := ArrayMesh.new()
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = mesh_verts
+	arrays[Mesh.ARRAY_INDEX] = mesh_indices
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	
+	var mi := MeshInstance3D.new()
+	mi.name = "Political_" + country_code
+	mi.mesh = mesh
+	
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.emission_enabled = true
+	mat.emission = color
+	mat.emission_energy_multiplier = emission_energy
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.render_priority = render_priority
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	
+	mi.material_override = mat
+	return mi
+
+func _subdivide_triangle(verts: Array[Vector3], level: int, radius: float) -> Array[Vector3]:
+	if level <= 0:
+		return verts
+	
+	var a: Vector3 = verts[0]
+	var b: Vector3 = verts[1]
+	var c: Vector3 = verts[2]
+	
+	var mab := ((a + b) * 0.5).normalized() * radius
+	var mbc := ((b + c) * 0.5).normalized() * radius
+	var mca := ((c + a) * 0.5).normalized() * radius
+	
+	var result: Array[Vector3] = []
+	
+	# 4 neue Dreiecke
+	result.append_array(_subdivide_triangle([a, mab, mca], level - 1, radius))
+	result.append_array(_subdivide_triangle([b, mbc, mab], level - 1, radius))
+	result.append_array(_subdivide_triangle([c, mca, mbc], level - 1, radius))
+	result.append_array(_subdivide_triangle([mab, mbc, mca], level - 1, radius))
+	
+	return result
+
+func clear_map() -> void:
+	for mi in _country_meshes.values():
 		if is_instance_valid(mi):
 			mi.queue_free()
-	_fill_nodes.clear()
+	_country_meshes.clear()
 
 # ==================== HELPER ====================
 
@@ -83,7 +202,7 @@ func _load_json_dict(path: String) -> Dictionary:
 	file.close()
 	var json := JSON.new()
 	if json.parse(text) != OK: return {}
-	return json.data if json.data is Dictionary else {}
+	return json.data if json.data is Dictionary else []
 
 func _lat_lon_to_vector3(lat_deg: float, lon_deg: float, radius: float) -> Vector3:
 	var lat := deg_to_rad(lat_deg)
@@ -112,57 +231,3 @@ func _extract_outer_rings(geom: Dictionary) -> Array[PackedVector2Array]:
 				if poly.size() > 0:
 					rings.append(_coords_to_packed_vec2(poly[0]))
 	return rings
-
-func _create_filled_mesh_for_state(geom: Dictionary, color: Color, state_id: int, country_code: String) -> void:
-	var rings := _extract_outer_rings(geom)
-	if rings.is_empty(): return
-
-	var mesh_verts := PackedVector3Array()
-	var mesh_indices := PackedInt32Array()
-	var vcount := 0
-	var radius := _globe.earth_radius * fill_radius_multiplier
-
-	for ring in rings:
-		if ring.size() < 3: continue
-		var tris := Geometry2D.triangulate_polygon(ring)
-		if tris.is_empty(): continue
-
-		for i in range(0, tris.size(), 3):
-			for j in 3:
-				var pidx := tris[i + j]
-				var pt := ring[pidx]
-				var v3 := _lat_lon_to_vector3(pt.y, pt.x, radius)
-				mesh_verts.append(v3)
-				mesh_indices.append(vcount)
-				vcount += 1
-
-	if mesh_verts.is_empty(): return
-
-	var mesh := ArrayMesh.new()
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = mesh_verts
-	if not mesh_indices.is_empty():
-		arrays[Mesh.ARRAY_INDEX] = mesh_indices
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-
-	var mi := MeshInstance3D.new()
-	mi.name = "Political_" + country_code + "_" + str(state_id)
-	mi.mesh = mesh
-
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.emission_enabled = true
-	mat.emission = Color(1.0, 0.95, 0.4)
-	mat.emission_energy_multiplier = emission_energy
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	
-	# === WICHTIG für "immer sichtbar" ===
-	mat.render_priority = render_priority          # 15 = über allem (Coastlines=10)
-	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED   # Damit nichts von hinten verschwindet
-
-	mi.material_override = mat
-	_globe.add_child(mi)
-	_fill_nodes.append(mi)
