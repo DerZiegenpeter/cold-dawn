@@ -111,7 +111,7 @@ func select_entity(entity) -> void:
 		return
 
 	if selected_entity:
-			n_selected.set_selected(false)
+		selected_entity.set_selected(false)
 
 	selected_entity = entity
 	entity.set_selected(true)
