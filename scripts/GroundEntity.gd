@@ -18,7 +18,6 @@ var target_pos: Vector3 = Vector3.ZERO
 
 const ENTITY_SIZE := 2.2
 const SEPARATION_RADIUS := 3.8
-
 const SEPARATION_FORCE := 2.5
 
 func _ready() -> void:
@@ -138,23 +137,23 @@ func _resolve_entity_collisions() -> void:
 		if other.global_position.length() < 1.0:
 			continue
 
-		var diff := global_position - other.global_position
-		var dist := diff.length()
+		var diff: Vector3 = global_position - other.global_position
+		var dist: float = diff.length()
 
 		if dist < 0.05 or dist > SEPARATION_RADIUS:
 			continue
 
-		var push_dir := diff.normalized()
-		var force := (SEPARATION_RADIUS - dist) * SEPARATION_FORCE
+		var push_dir: Vector3 = diff.normalized()
+		var force: float = (SEPARATION_RADIUS - dist) * SEPARATION_FORCE
 
-		var normal := global_position.normalized()
-		var tangential := (push_dir - push_dir.dot(normal) * normal) * force * 0.7
+		var normal: Vector3 = global_position.normalized()
+		var tangential: Vector3 = (push_dir - push_dir.dot(normal) * normal) * force * 0.7
 
 		global_position += tangential
 
 		if is_instance_valid(other):
-			var other_normal := other.global_position.normalized()
-			var other_tang := (-push_dir - (-push_dir).dot(other_normal) * other_normal) * force * 0.35
+			var other_normal: Vector3 = other.global_position.normalized()
+			var other_tang: Vector3 = (-push_dir - (-push_dir).dot(other_normal) * other_normal) * force * 0.35
 			other.global_position += other_tang
 
 		_orient_to_surface()
