@@ -13,18 +13,20 @@ const SURFACE_LIFT := 1.002
 @export var city_color: Color = Color(1.0, 1.0, 1.0)
 
 var state_data: Dictionary = {}
-var state_polygons: Dictionary = {}   # state_id -> Array of PackedVector2Array (lon, lat in degrees)
+var state_polygons: Dictionary = {}
+var state_centers: Dictionary = {}
 
 func _ready() -> void:
 	load_state_data()
 	create_coastlines()
 	create_states()
 	create_cities()
-	
-	# === Ground Entities (UnitManager) ===
+
+	# Neue Systeme initialisieren
+	LandSystem.initialize_from_globe(self)
 	UnitManager.initialize(self)
 	UnitManager.load_and_spawn_oob()
-	
+
 	print("Cold Dawn Globe ready!")
 
 func load_state_data() -> void:
@@ -38,100 +40,31 @@ func load_state_data() -> void:
 			state_data[sid] = state
 	file.close()
 
-func normalize_name(text) -> String:
-	if text == null or text == "": return ""
-	var s := str(text).to_lower().strip_edges()
-	s = s.replace(" ", "").replace("-", "").replace("_", "").replace("'", "")
-	return s
-
-func lat_lon_to_vector3(lat_deg: float, lon_deg: float, radius: float) -> Vector3:
-	var lat := deg_to_rad(lat_deg)
-	var lon := deg_to_rad(lon_deg)
-	var x := radius * cos(lat) * sin(lon)
-	var y := radius * sin(lat)
-	var z := radius * cos(lat) * cos(lon)
-	return Vector3(x, y, z)
-
-func load_geojson(path: String) -> Dictionary:
-	if not FileAccess.file_exists(path): return {}
-	var file := FileAccess.open(path, FileAccess.READ)
-	var content := file.get_as_text()
-	file.close()
-	var json := JSON.new()
-	if json.parse(content) != OK: return {}
-	return json.data
-
-func create_line_layer(file_path: String, name: String, albedo: Color, emission_energy: float, render_priority: int) -> void:
-	var data := load_geojson(file_path)
-	if data.is_empty(): return
-
-	var vertices := PackedVector3Array()
-	if data.get("type") == "FeatureCollection":
-		for feature in data.get("features", []):
-			_add_geometry(feature.get("geometry", {}), vertices)
-
-	if vertices.is_empty(): return
-
-	var mesh := ArrayMesh.new()
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
-
-	var mi := MeshInstance3D.new()
-	mi.name = name
-	mi.mesh = mesh
-
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = albedo
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.emission_enabled = true
-	mat.emission = albedo
-	mat.emission_energy_multiplier = emission_energy
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.render_priority = render_priority
-	if name != "Coastlines":
-		mat.albedo_color.a = 0.0
-
-	mi.material_override = mat
-	add_child(mi)
-
-func create_coastlines() -> void:
-	create_line_layer("res://data/geojson/coastline.geojson", "Coastlines", coastline_color, coastline_emission_energy, 10)
-
 func create_states() -> void:
 	var data := load_geojson("res://data/geojson/states.geojson")
 	if data.is_empty() or data.get("type") != "FeatureCollection": return
 
 	var created := 0
-	var no_data := 0
 	var index := 0
 
 	for feature in data.get("features", []):
 		index += 1
-		var props = feature.get("properties", {})
-		var raw_name = props.get("name")
-		var state_name = raw_name if raw_name != null else "Unknown"
-
 		var state_id := index
-
-		if state_data.has(state_id):
-			pass
-		else:
-			no_data += 1
 
 		var vertices := PackedVector3Array()
 		_add_geometry(feature.get("geometry", {}), vertices)
 
-		# Store polygon for land check (only outer ring)
+		# Polygon-Daten für LandSystem speichern
 		if feature.get("geometry", {}).get("type") in ["Polygon", "MultiPolygon"]:
-			var rings := []
-			if feature["geometry"]["type"] == "Polygon":
-				rings = feature["geometry"]["coordinates"]
-			else:
-				rings = feature["geometry"]["coordinates"][0] if feature["geometry"]["coordinates"].size() > 0 else []
-			if rings.size() > 0:
-				state_polygons[state_id] = rings[0]   # outer ring as Array of [lon, lat]
+			var coords = feature["geometry"]["coordinates"]
+			var outer_ring := []
+			if feature["geometry"]["type"] == "Polygon" and coords.size() > 0:
+				outer_ring = coords[0]
+			elif feature["geometry"]["type"] == "MultiPolygon" and coords.size() > 0 and coords[0].size() > 0:
+				outer_ring = coords[0][0]
+
+			if outer_ring.size() > 0:
+				state_polygons[state_id] = outer_ring
 
 		if vertices.is_empty(): continue
 
@@ -141,6 +74,8 @@ func create_states() -> void:
 		if vertices.size() > 0:
 			center /= float(vertices.size())
 			center = center.normalized() * (earth_radius * SURFACE_LIFT)
+
+		state_centers[state_id] = center
 
 		var local_vertices := PackedVector3Array()
 		local_vertices.resize(vertices.size())
@@ -172,7 +107,10 @@ func create_states() -> void:
 		add_child(mi)
 		created += 1
 
-	print("States erstellt: ", created, " | Ohne perfektes Daten-Match: ", no_data)
+	print("States erstellt: ", created)
+
+func create_coastlines() -> void:
+	create_line_layer("res://data/geojson/coastline.geojson", "Coastlines", coastline_color, coastline_emission_energy, 10)
 
 func create_cities() -> void:
 	var data := load_geojson("res://data/geojson/cities.geojson")
@@ -209,36 +147,57 @@ func create_cities() -> void:
 
 	add_child(mi)
 
-# Echte Land-Prüfung: Ist der Punkt innerhalb eines State-Polygons?
-func is_position_on_land(world_pos: Vector3) -> bool:
-	if world_pos.length() < 1.0:
-		return false
+func create_line_layer(file_path: String, name: String, albedo: Color, emission_energy: float, render_priority: int) -> void:
+	var data := load_geojson(file_path)
+	if data.is_empty(): return
 
-	# Weltposition -> lat/lon umrechnen
-	var pos_normalized := world_pos.normalized()
-	var lat := rad_to_deg(asin(pos_normalized.y))
-	var lon := rad_to_deg(atan2(pos_normalized.x, pos_normalized.z))
+	var vertices := PackedVector3Array()
+	if data.get("type") == "FeatureCollection":
+		for feature in data.get("features", []):
+			_add_geometry(feature.get("geometry", {}), vertices)
 
-	for state_id in state_polygons:
-		var ring: Array = state_polygons[state_id]
-		if _point_in_polygon(lon, lat, ring):
-			return true
+	if vertices.is_empty(): return
 
-	return false
+	var mesh := ArrayMesh.new()
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
 
-func _point_in_polygon(lon: float, lat: float, ring: Array) -> bool:
-	var inside := false
-	var j := ring.size() - 1
-	for i in range(ring.size()):
-		var xi := float(ring[i][0])
-		var yi := float(ring[i][1])
-		var xj := float(ring[j][0])
-		var yj := float(ring[j][1])
+	var mi := MeshInstance3D.new()
+	mi.name = name
+	mi.mesh = mesh
 
-		if ((yi > lat) != (yj > lat)) and (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi if yj != yi else xi):
-			inside = not inside
-		j = i
-	return inside
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = albedo
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.emission_enabled = true
+	mat.emission = albedo
+	mat.emission_energy_multiplier = emission_energy
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.render_priority = render_priority
+	if name != "Coastlines":
+		mat.albedo_color.a = 0.0
+
+	mi.material_override = mat
+	add_child(mi)
+
+func lat_lon_to_vector3(lat_deg: float, lon_deg: float, radius: float) -> Vector3:
+	var lat := deg_to_rad(lat_deg)
+	var lon := deg_to_rad(lon_deg)
+	var x := radius * cos(lat) * sin(lon)
+	var y := radius * sin(lat)
+	var z := radius * cos(lat) * cos(lon)
+	return Vector3(x, y, z)
+
+func load_geojson(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path): return {}
+	var file := FileAccess.open(path, FileAccess.READ)
+	var content := file.get_as_text()
+	file.close()
+	var json := JSON.new()
+	if json.parse(content) != OK: return {}
+	return json.data
 
 func _add_geometry(geom: Dictionary, vertices: PackedVector3Array) -> void:
 	if not geom.has("type") or not geom.has("coordinates"): return
