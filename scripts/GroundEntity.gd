@@ -2,10 +2,10 @@ extends Node3D
 class_name GroundEntity
 
 ## Ground Entity
-## - Perfekter Wireframe-Würfel (nur Kanten)
-## - Klein + gleichmäßige Seiten
-## - Steht exakt auf der Globus-Oberfläche (mit gesamter Seite / Raute bei 45° geneigt)
-## - Sehr langsame Bewegung entlang Großkreis
+## - Wireframe Würfel
+## - Steht immer exakt mit flacher Seite auf der Oberfläche (Raute-Optik durch 45°)
+## - Konstante Geschwindigkeit, kein Abbremsen/Anfahren, kein End-Wackeln
+## - Ground nur auf Land (wird beim Befehl geprüft)
 
 signal moved(new_pos: Vector3)
 
@@ -76,20 +76,22 @@ func _process(delta: float) -> void:
 	var target_dir: Vector3 = target_pos.normalized()
 	var angle: float = current_dir.angle_to(target_dir)
 
-	if angle < 0.012:
+	# Konstante Winkelgeschwindigkeit - kein Abbremsen, kein End-Sprint/Wackeln
+	var angular_speed: float = 0.04  # bei Bedarf anpassen (0.03 = sehr langsam, 0.06 = flotter)
+	var step: float = angular_speed * delta
+
+	if angle <= step:
 		global_position = target_pos
 		target_pos = Vector3.ZERO
 		_orient_to_surface()
 		return
 
-	# Sehr langsame konstante Geschwindigkeit für Ground Units (viel langsamer als Air)
-	var angular_speed: float = 0.05
-	var t: float = clamp(angular_speed * delta / angle, 0.0, 1.0)
+	var t: float = step / angle
 	var new_dir: Vector3 = current_dir.slerp(target_dir, t)
 
 	var radius: float = global_position.length()
 	global_position = new_dir * radius
-	_orient_to_surface()
+	_orient_to_surface()   # immer perfekt zur Oberfläche ausrichten (auch während der Bewegung auf der Kugel)
 
 func _orient_to_surface() -> void:
 	if mesh_instance == null:
@@ -99,10 +101,11 @@ func _orient_to_surface() -> void:
 	var normal: Vector3 = global_position.normalized()
 	if normal.length_squared() < 0.0001:
 		return
+
+	# Flache Seite zum Globus-Mittelpunkt (ganze Seite "unten")
 	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
 
-	# 45° Rotation um die radiale Achse (FORWARD nach looking_at), 
-	# damit das Rechteck wie eine Raute geneigt aussieht – gesamte Seite "unten" statt spitze Ecke.
+	# 45° Roll für schöne Raute-Optik (Rechteck geneigt)
 	mesh_instance.rotate_object_local(Vector3.FORWARD, deg_to_rad(45))
 
 func set_data(entry: Dictionary, color: Color) -> void:
@@ -121,8 +124,7 @@ func set_selected(selected: bool) -> void:
 
 func move_to(world_pos: Vector3) -> void:
 	var s: float = 2.2
-	# Exakt auf der Oberfläche: Zentrum so angehoben, dass die gesamte untere Seite (Face) genau auf der Surface liegt.
-	# surface_radius + s/2
+	# Exakt mit unterer Seite auf der Oberfläche
 	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 0.5)
 	target_pos = lifted
 

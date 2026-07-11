@@ -2,9 +2,9 @@ extends Node3D
 class_name AirEntity
 
 ## Air Entity
-## - Wireframe-Raute / Diamant (Kante nach oben)
-## - Schwebt höher
-## - Kann überall hin
+## - Sieht aus wie GroundEntity, aber mit KANTE nach unten (nicht flache Seite)
+## - Leicht erhöht
+## - Gleiche konstante Bewegung wie Ground
 
 signal moved(new_pos: Vector3)
 
@@ -32,7 +32,7 @@ func _create_visual() -> void:
 	var vertices := PackedVector3Array()
 	var indices := PackedInt32Array()
 
-	var s := 2.4
+	var s := 2.2   # jetzt exakt wie Ground für "genau wie die Ground Entities aussehen"
 
 	vertices.push_back(Vector3(-s/2, -s/2, -s/2))
 	vertices.push_back(Vector3( s/2, -s/2, -s/2))
@@ -67,6 +67,31 @@ func _create_visual() -> void:
 
 	add_child(mesh_instance)
 
+func _process(delta: float) -> void:
+	if target_pos == Vector3.ZERO:
+		return
+
+	var current_dir: Vector3 = global_position.normalized()
+	var target_dir: Vector3 = target_pos.normalized()
+	var angle: float = current_dir.angle_to(target_dir)
+
+	# GENAU dieselbe konstante Bewegung wie bei GroundEntity
+	var angular_speed: float = 0.05  # etwas flotter als Ground (Air soll schneller wirken)
+	var step: float = angular_speed * delta
+
+	if angle <= step:
+		global_position = target_pos
+		target_pos = Vector3.ZERO
+		_orient_to_surface()
+		return
+
+	var t: float = step / angle
+	var new_dir: Vector3 = current_dir.slerp(target_dir, t)
+
+	var radius: float = global_position.length()
+	global_position = new_dir * radius
+	_orient_to_surface()
+
 func _orient_to_surface() -> void:
 	if mesh_instance == null:
 		return
@@ -76,35 +101,12 @@ func _orient_to_surface() -> void:
 	if normal.length_squared() < 0.0001:
 		return
 
-	# Basis normal ausrichten
+	# Basis wie bei Ground (flache Seite zum Mittelpunkt + Raute-Roll)
 	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
-
-	# Zusätzliche Drehung für Raute-Form (Kante nach oben)
-	mesh_instance.rotate_object_local(Vector3.RIGHT, deg_to_rad(45))
 	mesh_instance.rotate_object_local(Vector3.FORWARD, deg_to_rad(45))
 
-func _process(delta: float) -> void:
-	if target_pos == Vector3.ZERO:
-		return
-
-	var current_dir: Vector3 = global_position.normalized()
-	var target_dir: Vector3 = target_pos.normalized()
-	var angle: float = current_dir.angle_to(target_dir)
-
-	if angle < 0.012:
-		global_position = target_pos
-		target_pos = Vector3.ZERO
-		_orient_to_surface()
-		return
-
-	# Langsame Bewegung
-	var angular_speed: float = 0.25
-	var t: float = clamp(angular_speed * delta / angle, 0.0, 1.0)
-	var new_dir: Vector3 = current_dir.slerp(target_dir, t)
-
-	var radius: float = global_position.length()
-	global_position = new_dir * radius
-	_orient_to_surface()
+	# ZUSÄTZLICH geneigt, damit die GERADE KANTE nach unten zeigt (nicht die flache Seite)
+	mesh_instance.rotate_object_local(Vector3.RIGHT, deg_to_rad(45))
 
 func set_data(entry: Dictionary, color: Color) -> void:
 	data = entry
@@ -121,9 +123,9 @@ func set_selected(selected: bool) -> void:
 	_update_visual()
 
 func move_to(world_pos: Vector3) -> void:
-	var s: float = 2.4
-	# Air Entities schweben deutlich höher
-	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 1.6)
+	var s: float = 2.2
+	# Leicht erhöht (Air schwebt)
+	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 1.8)
 	target_pos = lifted
 
 func update_fade(alpha: float) -> void:

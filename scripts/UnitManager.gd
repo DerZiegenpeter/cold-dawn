@@ -87,7 +87,7 @@ func _spawn_entity(entry: Dictionary) -> void:
 
 	globe.add_child(entity)
 
-	# Set initial position - EXAKT auf der Oberfläche (konsistent mit move_to)
+	# Set initial position - EXAKT konsistent mit move_to
 	if entry.has("position"):
 		var pos_dict: Dictionary = entry["position"]
 		if pos_dict.has("lat") and pos_dict.has("lon"):
@@ -95,9 +95,9 @@ func _spawn_entity(entry: Dictionary) -> void:
 			var lon: float = float(pos_dict["lon"])
 			var lift: float = 1.002
 			var base_radius: float = globe.earth_radius * lift
-			# Ground: exakt surface + s/2 (1.1), vorher 2.8 -> schwebte!
-			# Air bleibt höher schwebend
-			var extra_height: float = 8.0 if type == "air" else 1.1
+			# Ground: exakt surface + s/2
+			# Air: leicht erhöht (konsistent mit neuem move_to)
+			var extra_height: float = 4.0 if type == "air" else 1.1
 			var radius: float = base_radius + extra_height
 			var world_pos: Vector3 = globe.lat_lon_to_vector3(lat, lon, radius)
 			entity.global_position = world_pos
