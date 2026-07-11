@@ -1,31 +1,26 @@
 extends Node
-class_name LandSystem
 
 ## LandSystem
 ## Zentrale Komponente für alle Land-Validierungen
-## Optimiert mit Broad-Phase + Narrow-Phase
 
 signal land_data_ready
 
-var state_polygons: Dictionary = {}           # state_id -> Array[Array] (Ringe)
-var state_centers: Dictionary = {}            # state_id -> Vector3 (Weltposition)
+var state_polygons: Dictionary = {}
+var state_centers: Dictionary = {}
 
 var _state_ids: Array = []
-
 var _initialized := false
 
-func _ready() -> void:
-	# Wird später von Globe initialisiert
-	pass
-
-func initialize_from_globe(globe: Globe) -> void:
+func initialize_from_globe(globe: Node) -> void:
 	if _initialized:
 		return
 
-	state_polygons = globe.state_polygons
-	state_centers = globe.state_centers
-	_state_ids = state_centers.keys()
+	if globe.has_method("get_state_polygons"):
+		state_polygons = globe.call("get_state_polygons")
+	if globe.has_method("get_state_centers"):
+		state_centers = globe.call("get_state_centers")
 
+	_state_ids = state_centers.keys()
 	_initialized = true
 	land_data_ready.emit()
 	print("[LandSystem] Initialisiert mit ", _state_ids.size(), " States")
@@ -34,41 +29,35 @@ func is_position_on_land(world_pos: Vector3) -> bool:
 	if not _initialized or world_pos.length() < 1.0:
 		return false
 
-	# === Broad Phase (sehr schnell) ===
+	# Broad Phase
 	var min_dist := 999999.0
-	var closest_state_id := -1
+	var closest_id := -1
 
-	for state_id in _state_ids:
-		var center: Vector3 = state_centers[state_id]
-		var dist := center.distance_to(world_pos)
+	for id in _state_ids:
+		var dist := state_centers[id].distance_to(world_pos)
 		if dist < min_dist:
 			min_dist = dist
-			closest_state_id = state_id
+			closest_id = id
 
-	# Wenn weit weg von allen Centern → definitiv Wasser
 	if min_dist > 120.0:
 		return false
 
-	# === Narrow Phase (teurer, aber nur bei Bedarf) ===
-	if closest_state_id != -1 and state_polygons.has(closest_state_id):
-		var ring: Array = state_polygons[closest_state_id]
-		if _point_in_polygon_world(world_pos, ring):
+	# Narrow Phase
+	if closest_id != -1 and state_polygons.has(closest_id):
+		if _point_in_polygon_world(world_pos, state_polygons[closest_id]):
 			return true
 
-	# Fallback: Prüfe alle nahen States (falls Broad-Phase nicht getroffen hat)
-	for state_id in _state_ids:
-		if state_centers[state_id].distance_to(world_pos) < 80.0:
-			if state_polygons.has(state_id):
-				if _point_in_polygon_world(world_pos, state_polygons[state_id]):
-					return true
+	for id in _state_ids:
+		if state_centers[id].distance_to(world_pos) < 80.0:
+			if state_polygons.has(id) and _point_in_polygon_world(world_pos, state_polygons[id]):
+				return true
 
 	return false
 
 func _point_in_polygon_world(world_pos: Vector3, ring: Array) -> bool:
-	var pos_norm := world_pos.normalized()
-	var lat := rad_to_deg(asin(pos_norm.y))
-	var lon := rad_to_deg(atan2(pos_norm.x, pos_norm.z))
-
+	var n := world_pos.normalized()
+	var lat := rad_to_deg(asin(n.y))
+	var lon := rad_to_deg(atan2(n.x, n.z))
 	return _point_in_polygon(lon, lat, ring)
 
 func _point_in_polygon(lon: float, lat: float, ring: Array) -> bool:
@@ -79,14 +68,7 @@ func _point_in_polygon(lon: float, lat: float, ring: Array) -> bool:
 		var yi := float(ring[i][1])
 		var xj := float(ring[j][0])
 		var yj := float(ring[j][1])
-
-		var intersect := ((yi > lat) != (yj > lat)) and \
-			(lon < (xj - xi) * (lat - yi) / (yj - yi) + xi if yj != yi else xi)
-		if intersect:
+		if ((yi > lat) != (yj > lat)) and (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi if yj != yi else xi):
 			inside = not inside
 		j = i
 	return inside
-
-func get_nearest_land_position(world_pos: Vector3) -> Vector3:
-	# Später erweiterbar (z.B. Projektion auf nächsten State-Rand)
-	return world_pos
