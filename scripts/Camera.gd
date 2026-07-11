@@ -169,7 +169,7 @@ func _handle_right_click() -> void:
 
 	var hit_pos := _raycast_to_globe_sphere(from, dir)
 	if hit_pos != Vector3.ZERO:
-		if globe and globe.is_position_on_land(hit_pos):
+		if LandSystem and LandSystem.is_position_on_land(hit_pos):
 			UnitManager.move_selected_to(hit_pos)
 		else:
 			print("[Movement] Nur auf Land/States erlaubt!")
