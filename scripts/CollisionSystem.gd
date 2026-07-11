@@ -21,14 +21,14 @@ func resolve_collisions(entities: Array) -> void:
 			var dist: float = diff.length()
 			if dist < 0.05 or dist > separation_radius: continue
 
-			var push := diff.normalized() * ((separation_radius - dist) * separation_force)
+			var push: Vector3 = diff.normalized() * ((separation_radius - dist) * separation_force)
 
-			var na := a.global_position.normalized()
-			var ta := (push - push.dot(na) * na) * 0.6
+			var na: Vector3 = a.global_position.normalized()
+			var ta: Vector3 = (push - push.dot(na) * na) * 0.6
 			a.global_position += ta
 
-			var nb := b.global_position.normalized()
-			var tb := (-push - (-push).dot(nb) * nb) * 0.3
+			var nb: Vector3 = b.global_position.normalized()
+			var tb: Vector3 = (-push - (-push).dot(nb) * nb) * 0.3
 			b.global_position += tb
 
 			if a.has_method("_orient_to_surface"): a._orient_to_surface()
