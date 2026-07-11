@@ -242,17 +242,18 @@ func _try_select_state() -> void:
 		print("=== State ohne Daten ===")
 		print("Node-Name: ", node_name)
 		print("========================")
-	else:
-		var state_id := int(node_name.split("_")[1])
-		if globe.state_data.has(state_id):
-			var data = globe.state_data[state_id]
-			print("=== State angeklickt ===")
-			print("ID:        ", data.get("id"))
-			print("Name:      ", data.get("name"))
-			print("Owner:     ", data.get("owner"))
-			print("Controller:", data.get("controller"))
-			print("Cities:    ", data.get("cities", []))
-			print("========================")
+		return
+
+	var state_id := int(node_name.split("_")[1])
+	if globe.state_data.has(state_id):
+		var data = globe.state_data[state_id]
+		print("=== State angeklickt ===")
+		print("ID:        ", data.get("id"))
+		print("Name:      ", data.get("name"))
+		print("Owner:     ", data.get("owner"))
+		print("Controller:", data.get("controller"))
+		print("Cities:    ", data.get("cities", []))
+		print("========================")
 	else:
 		print("[Click] Keine Daten für State-ID ", state_id, " gefunden.")
 
