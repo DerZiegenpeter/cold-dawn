@@ -17,8 +17,8 @@ func resolve_collisions(entities: Array) -> void:
 			var b = entities[j]
 			if not is_instance_valid(b) or b.global_position.length() < 1.0: continue
 
-			var diff := a.global_position - b.global_position
-			var dist := diff.length()
+			var diff: Vector3 = a.global_position - b.global_position
+			var dist: float = diff.length()
 			if dist < 0.05 or dist > separation_radius: continue
 
 			var push := diff.normalized() * ((separation_radius - dist) * separation_force)
