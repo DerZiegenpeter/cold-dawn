@@ -2,8 +2,9 @@ extends Node3D
 class_name GroundEntity
 
 ## Ground Entity
-## - Steht mit FLACHER SEITE auf der Oberfläche (Rechteck-Optik von der Seite)
-## - Konstante Geschwindigkeit, immer perfekt ausgerichtet
+## - Steht mit FLACHER SEITE auf der Oberfläche
+## - Hat echte Collision in seinen visuellen Grenzen
+## - Gehört zu einer Nation (owner)
 
 signal moved(new_pos: Vector3)
 
@@ -12,10 +13,12 @@ var nation_color: Color = Color(0.6, 0.6, 0.6)
 var is_selected: bool = false
 
 var mesh_instance: MeshInstance3D = null
+var area: Area3D = null
 var target_pos: Vector3 = Vector3.ZERO
 
 func _ready() -> void:
 	_create_visual()
+	_create_collision()
 
 func _create_visual() -> void:
 	if mesh_instance != null:
@@ -66,6 +69,24 @@ func _create_visual() -> void:
 
 	add_child(mesh_instance)
 
+func _create_collision() -> void:
+	if area != null:
+		return
+
+	area = Area3D.new()
+	area.name = "CollisionArea"
+	area.monitoring = true
+	area.monitorable = true
+
+	var collision_shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	var s := 2.2
+	box.size = Vector3(s, s, s)
+	collision_shape.shape = box
+
+	area.add_child(collision_shape)
+	add_child(area)
+
 func _process(delta: float) -> void:
 	if target_pos == Vector3.ZERO:
 		return
@@ -99,11 +120,7 @@ func _orient_to_surface() -> void:
 	if normal.length_squared() < 0.0001:
 		return
 
-	# Nur looking_at → flache Seite exakt zum Globus-Mittelpunkt
-	# Dadurch sieht es von der Seite wie ein Rechteck aus, das flach auf der Oberfläche steht (wie in deinem Bild)
 	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
-
-	# KEINE extra 45° Rotation mehr bei Ground → bleibt rechteckig statt Raute
 
 func set_data(entry: Dictionary, color: Color) -> void:
 	data = entry

@@ -34,5 +34,41 @@
 	"owner": "DEU",
 	"type": "air",
 	"position": { "lat": 48.5, "lon": 11.0 }
+  },
+  {
+	"name": "1. Warszawska Dywizja Zmechanizowana",
+	"owner": "POL",
+	"type": "ground",
+	"position": { "lat": 52.23, "lon": 21.01 }
+  },
+  {
+	"name": "2. Brygada Zmechanizowana",
+	"owner": "POL",
+	"type": "ground",
+	"position": { "lat": 50.06, "lon": 19.94 }
+  },
+  {
+	"name": "3. Dywizja Zmechanizowana",
+	"owner": "POL",
+	"type": "ground",
+	"position": { "lat": 54.35, "lon": 18.65 }
+  },
+  {
+	"name": "4. Brygada Pancerna",
+	"owner": "POL",
+	"type": "ground",
+	"position": { "lat": 51.11, "lon": 17.03 }
+  },
+  {
+	"name": "1. Pułk Lotnictwa Myśliwskiego",
+	"owner": "POL",
+	"type": "air",
+	"position": { "lat": 52.3, "lon": 20.85 }
+  },
+  {
+	"name": "2. Eskadra Lotnictwa Taktycznego",
+	"owner": "POL",
+	"type": "air",
+	"position": { "lat": 51.75, "lon": 19.45 }
   }
 ]

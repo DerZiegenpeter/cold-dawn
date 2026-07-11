@@ -88,7 +88,7 @@ func _fade_coastlines() -> void:
 		alpha = clamp((distance - 550) / 350.0, 0.0, 1.0)
 
 	var col = mat.albedo_color
-	col.a = lerp(col.a, alpha, 0.15)
+	col.a = lerp(col.a, 0.15, alpha)
 	mat.albedo_color = col
 
 func _fade_all_states() -> void:
@@ -107,7 +107,7 @@ func _fade_all_states() -> void:
 				alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
 
 			var col = mat.albedo_color
-			col.a = lerp(col.a, alpha, 0.4)
+			col.a = lerp(col.a, 0.4, alpha)
 			if distance < states_fade_end + 30:
 				col.a = 1.0
 			mat.albedo_color = col
@@ -127,7 +127,7 @@ func _fade_cities() -> void:
 		alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
 
 	var col = mat.albedo_color
-	col.a = lerp(col.a, alpha, 0.4)
+	col.a = lerp(col.a, 0.4, alpha)
 	if distance < states_fade_end + 30:
 		col.a = 1.0
 	mat.albedo_color = col
@@ -170,13 +170,16 @@ func _is_on_land(world_pos: Vector3) -> bool:
 	if not globe:
 		return true
 
+	var min_dist := 999999.0
 	for child in globe.get_children():
 		if child is MeshInstance3D:
 			if child.name.begins_with("State_") or child.name.begins_with("Political_"):
-				var dist: float = child.global_position.distance_to(world_pos)
-				if dist < 95.0:
-					return true
-	return false
+				var dist := child.global_position.distance_to(world_pos)
+				if dist < min_dist:
+					min_dist = dist
+
+	# Deutlich strengere Prüfung (vorher 95 → jetzt ~35)
+	return min_dist < 38.0
 
 func _did_hit_anything(mouse_pos: Vector2) -> bool:
 	var entity = UnitManager.get_entity_at_mouse(mouse_pos, self)
@@ -254,8 +257,8 @@ func _try_select_state() -> void:
 			print("Controller:", data.get("controller"))
 			print("Cities:    ", data.get("cities", []))
 			print("========================")
-		else:
-			print("[Click] Keine Daten für State-ID ", state_id, " gefunden.")
+	else:
+		print("[Click] Keine Daten für State-ID ", state_id, " gefunden.")
 
 func _update_position() -> void:
 	if not target: return
