@@ -138,16 +138,13 @@ func _fade_ground_entities() -> void:
 func _handle_left_click() -> void:
 	var mouse_pos := get_viewport().get_mouse_position()
 	
-	# Ground Entity auswählen?
 	var entity = UnitManager.get_entity_at_mouse(mouse_pos, self)
 	if entity:
 		UnitManager.select_entity(entity)
 		return
 
-	# Normaler State-Klick
 	_try_select_state()
 
-	# Wenn nichts getroffen wurde → deselektieren
 	if not _did_hit_anything(mouse_pos):
 		UnitManager.deselect()
 
@@ -178,7 +175,6 @@ func _is_on_land(world_pos: Vector3) -> bool:
 				if dist < min_dist:
 					min_dist = dist
 
-	# Deutlich strengere Prüfung (vorher 95 → jetzt ~35)
 	return min_dist < 38.0
 
 func _did_hit_anything(mouse_pos: Vector2) -> bool:
