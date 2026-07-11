@@ -2,9 +2,9 @@ extends Node3D
 class_name GroundEntity
 
 ## Ground Entity
-## - Flache Seite auf Oberfläche (wireframe cube)
-## - Collision jetzt in der Scene definiert (Area3D + BoxShape3D size 2.2)
-## - Aktive Kollisionsauflösung zwischen GroundEntities (kein Überlappen)
+## - Flache Seite auf Oberfläche
+## - Collision in der Scene (Area3D + BoxShape 2.2)
+## - KANN SICH NUR AUF STATES BEWEGEN - nie auf Wasser!
 
 signal moved(new_pos: Vector3)
 
@@ -16,6 +16,8 @@ var mesh_instance: MeshInstance3D = null
 var collision_area: Area3D = null
 var target_pos: Vector3 = Vector3.ZERO
 
+var last_valid_pos: Vector3 = Vector3.ZERO   # NEU: Letzte gültige Position auf Land
+
 const ENTITY_SIZE := 2.2
 const SEPARATION_RADIUS := 3.8
 const SEPARATION_FORCE := 2.5
@@ -23,6 +25,7 @@ const SEPARATION_FORCE := 2.5
 func _ready() -> void:
 	_create_visual()
 	_setup_collision_from_scene_or_create()
+	last_valid_pos = global_position
 
 func _create_visual() -> void:
 	if mesh_instance != null:
@@ -100,7 +103,16 @@ func _setup_collision_from_scene_or_create() -> void:
 func _process(delta: float) -> void:
 	_resolve_entity_collisions()
 
+	# === NEU: Strenge Land-Validierung ===
+	if get_globe():
+		if not get_globe().is_position_on_land(global_position):
+			# Sofort zurück auf letztes gültiges Land
+			global_position = last_valid_pos
+			target_pos = Vector3.ZERO
+			return
+
 	if target_pos == Vector3.ZERO:
+		last_valid_pos = global_position
 		return
 
 	var current_dir: Vector3 = global_position.normalized()
@@ -112,6 +124,7 @@ func _process(delta: float) -> void:
 
 	if angle <= step:
 		global_position = target_pos
+		last_valid_pos = global_position
 		target_pos = Vector3.ZERO
 		_orient_to_surface()
 		_resolve_entity_collisions()
@@ -122,7 +135,19 @@ func _process(delta: float) -> void:
 
 	var radius: float = global_position.length()
 	global_position = new_dir * radius
+
+	# Nach jedem Schritt prüfen
+	if get_globe() and not get_globe().is_position_on_land(global_position):
+		global_position = last_valid_pos
+		target_pos = Vector3.ZERO
+		return
+
 	_orient_to_surface()
+
+func get_globe() -> Globe:
+	if get_parent() is Globe:
+		return get_parent() as Globe
+	return null
 
 func _resolve_entity_collisions() -> void:
 	if not is_instance_valid(self) or global_position.length() < 1.0:
@@ -180,12 +205,18 @@ func set_data(entry: Dictionary, color: Color) -> void:
 
 	_update_visual()
 	_orient_to_surface()
+	last_valid_pos = global_position
 
 func set_selected(selected: bool) -> void:
 	is_selected = selected
 	_update_visual()
 
 func move_to(world_pos: Vector3) -> void:
+	var globe = get_globe()
+	if globe and not globe.is_position_on_land(world_pos):
+		print("[GroundEntity] Move auf Wasser blockiert!")
+		return   # Move wird komplett abgelehnt
+
 	var s: float = ENTITY_SIZE
 	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 0.5)
 	target_pos = lifted
