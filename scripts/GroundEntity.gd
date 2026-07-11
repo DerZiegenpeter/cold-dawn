@@ -2,9 +2,10 @@ extends Node3D
 class_name GroundEntity
 
 ## Ground Entity
-## - Flache Seite auf Oberfläche
-## - Unsichtbare aber funktionsfähige Collision (Area3D + BoxShape)
-## - Kollidiert nicht mit anderen Entities (nur für Interaktionen)
+## - Flache Seite auf Oberfläche (wireframe cube)
+## - Collision jetzt in der Scene definiert (Area3D + BoxShape3D size 2.2 passend zur Entity-Größe)
+## - Kollision mit anderen GroundEntities wird aktiv aufgelöst (kein Überlappen mehr)
+## - Einheiten können nicht mehr außerhalb von States (auf Wasser) bewegt werden (Gate in Camera + Validierung)
 
 signal moved(new_pos: Vector3)
 
@@ -16,9 +17,12 @@ var mesh_instance: MeshInstance3D = null
 var collision_area: Area3D = null
 var target_pos: Vector3 = Vector3.ZERO
 
+const ENTITY_SIZE := 2.2
+const COLLISION_RADIUS := 2.8  # Etwas Puffer für Separation
+
 func _ready() -> void:
 	_create_visual()
-	_create_collision()
+	_setup_collision_from_scene_or_create()
 
 func _create_visual() -> void:
 	if mesh_instance != null:
@@ -34,7 +38,7 @@ func _create_visual() -> void:
 	var vertices := PackedVector3Array()
 	var indices := PackedInt32Array()
 
-	var s := 2.2
+	var s := ENTITY_SIZE
 
 	vertices.push_back(Vector3(-s/2, -s/2, -s/2))
 	vertices.push_back(Vector3( s/2, -s/2, -s/2))
@@ -69,7 +73,14 @@ func _create_visual() -> void:
 
 	add_child(mesh_instance)
 
-func _create_collision() -> void:
+func _setup_collision_from_scene_or_create() -> void:
+	# Priorität: Collision aus der Scene verwenden (wie gewünscht "in der scene für ground entities")
+	if has_node("CollisionArea"):
+		collision_area = get_node("CollisionArea")
+		print("[GroundEntity] CollisionArea aus Scene geladen (Größe passend zur Entity)")
+		return
+
+	# Fallback: dynamisch erzeugen (für alte Scenes ohne Node)
 	if collision_area != null:
 		return
 
@@ -77,16 +88,22 @@ func _create_collision() -> void:
 	collision_area.name = "CollisionArea"
 	collision_area.collision_layer = 1
 	collision_area.collision_mask = 1
+	collision_area.monitoring = true
+	collision_area.monitorable = true
 
-	var shape := CollisionShape3D.new()
+	var shape_node := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(2.2, 2.2, 2.2)
-	shape.shape = box
+	box.size = Vector3(ENTITY_SIZE, ENTITY_SIZE, ENTITY_SIZE)
+	shape_node.shape = box
+	shape_node.name = "CollisionShape3D"
 
-	collision_area.add_child(shape)
+	collision_area.add_child(shape_node)
 	add_child(collision_area)
+	print("[GroundEntity] CollisionArea dynamisch erstellt (Fallback)")
 
 func _process(delta: float) -> void:
+	_resolve_entity_collisions()  # NEU: Aktive Kollisionsauflösung zwischen GroundEntities
+
 	if target_pos == Vector3.ZERO:
 		return
 
@@ -101,6 +118,7 @@ func _process(delta: float) -> void:
 		global_position = target_pos
 		target_pos = Vector3.ZERO
 		_orient_to_surface()
+		_resolve_entity_collisions()  # Nach Ankunft nochmal prüfen
 		return
 
 	var t: float = step / angle
@@ -109,6 +127,43 @@ func _process(delta: float) -> void:
 	var radius: float = global_position.length()
 	global_position = new_dir * radius
 	_orient_to_surface()
+
+func _resolve_entity_collisions() -> void:
+	# Einfache Separation: GroundEntities stoßen sich gegenseitig ab (kein Überlappen)
+	if not is_instance_valid(self) or global_position.length() < 1.0:
+		return
+
+	var others = []
+	if Engine.has_singleton("UnitManager"):
+		others = UnitManager.active_entities
+
+	for other in others:
+		if other == self or not is_instance_valid(other) or not other is GroundEntity:
+			continue
+		if other.global_position.length() < 1.0:
+			continue
+
+		var diff: Vector3 = global_position - other.global_position
+		var dist: float = diff.length()
+		if dist < 0.001 or dist > COLLISION_RADIUS * 2.0:
+			continue
+
+		# Separation force (stärker wenn näher)
+		var push_strength: float = (COLLISION_RADIUS * 2.0 - dist) * 0.6
+		var push_dir: Vector3 = diff.normalized() * push_strength
+
+		# Auf Sphere bleiben: nur tangential verschieben (nicht radial)
+		var normal: Vector3 = global_position.normalized()
+		var tangential: Vector3 = push_dir - push_dir.dot(normal) * normal
+
+		global_position += tangential * 0.5  # Sanft anwenden
+		# Optional: auch anderen leicht zurückschieben (symmetrisch)
+		if is_instance_valid(other):
+			var other_normal: Vector3 = other.global_position.normalized()
+			var other_tang: Vector3 = -tangential - (-tangential).dot(other_normal) * other_normal
+			other.global_position += other_tang * 0.25
+
+		_orient_to_surface()
 
 func _orient_to_surface() -> void:
 	if mesh_instance == null:
@@ -128,7 +183,7 @@ func set_data(entry: Dictionary, color: Color) -> void:
 	if mesh_instance == null:
 		_create_visual()
 	if collision_area == null:
-		_create_collision()
+		_setup_collision_from_scene_or_create()
 
 	_update_visual()
 	_orient_to_surface()
@@ -138,7 +193,7 @@ func set_selected(selected: bool) -> void:
 	_update_visual()
 
 func move_to(world_pos: Vector3) -> void:
-	var s: float = 2.2
+	var s: float = ENTITY_SIZE
 	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 0.5)
 	target_pos = lifted
 

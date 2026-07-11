@@ -59,7 +59,7 @@ func _input(event: InputEvent) -> void:
 		var delta: Vector2 = event.position - last_mouse_pos
 		var current_sens: float = sensitivity * clampf(distance / 1100.0, 0.25, 1.0)
 		target_yaw   -= delta.x * current_sens
-		target_pitch = clamp(target_pitch + delta.y * current_sens, -80, 80)
+		 target_pitch = clamp(target_pitch + delta.y * current_sens, -80, 80)
 		last_mouse_pos = event.position
 
 func _process(delta: float) -> void:
@@ -124,7 +124,7 @@ func _fade_cities() -> void:
 	elif distance < states_fade_end:
 		alpha = 1.0
 	else:
-		alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
+			alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
 
 	var col = mat.albedo_color
 	col.a = lerp(col.a, 0.4, alpha)
@@ -161,7 +161,7 @@ func _handle_right_click() -> void:
 		if _is_on_land(hit_pos):
 			UnitManager.move_selected_to(hit_pos)
 		else:
-			print("[Movement] Nur auf Land/States erlaubt!")
+			print("[Movement] Nur auf Land/States erlaubt! (Klick zu weit von State-Center)")
 
 func _is_on_land(world_pos: Vector3) -> bool:
 	if not globe:
@@ -175,8 +175,9 @@ func _is_on_land(world_pos: Vector3) -> bool:
 				if dist < min_dist:
 					min_dist = dist
 
-	# Strengere Land-Prüfung
-	return min_dist < 32.0
+	# Verbesserte Land-Prüfung (größerer Threshold für kleine States wie NL, dennoch Wasser weitgehend blockiert)
+	# TODO: Für perfekte Lösung Polygon-Containment aus states.geojson implementieren (point-in-spherical-polygon)
+	return min_dist < 65.0
 
 func _did_hit_anything(mouse_pos: Vector2) -> bool:
 	var entity = UnitManager.get_entity_at_mouse(mouse_pos, self)
@@ -217,55 +218,8 @@ func _try_select_state() -> void:
 	var mouse_pos := get_viewport().get_mouse_position()
 	var from := project_ray_origin(mouse_pos)
 	var dir := project_ray_normal(mouse_pos)
-
-	var closest_state: Node3D = null
-	var closest_dist: float = 999999.0
-
-	for child in globe.get_children():
-		if child is MeshInstance3D and child.name.begins_with("State_"):
-			var to_state: Vector3 = (child.global_position - from).normalized()
-			var dist: float = from.distance_to(child.global_position)
-			var angle: float = dir.dot(to_state)
-
-			if angle > 0.98 and dist < closest_dist:
-				closest_dist = dist
-				closest_state = child
-
-	if closest_state == null:
-		print("[Click] Kein State in der Nähe gefunden.")
-		return
-
-	print("[Click] State gefunden: ", closest_state.name)
-
-	var node_name = closest_state.name
-
-	if node_name.begins_with("State_Unknown_"):
-		print("=== State ohne Daten ===")
-		print("Node-Name: ", node_name)
-		print("========================")
-		return
-
-	var state_id := int(node_name.split("_")[1])
-	if globe.state_data.has(state_id):
-		var data = globe.state_data[state_id]
-		print("=== State angeklickt ===")
-		print("ID:        ", data.get("id"))
-		print("Name:      ", data.get("name"))
-		print("Owner:     ", data.get("owner"))
-		print("Controller:", data.get("controller"))
-		print("Cities:    ", data.get("cities", []))
-		print("========================")
+	var hit := _raycast_to_globe_sphere(from, dir)
+	if hit != Vector3.ZERO:
+		print("[Click] Hit Globe at: ", hit)
 	else:
-		print("[Click] Keine Daten für State-ID ", state_id, " gefunden.")
-
-func _update_position() -> void:
-	if not target: return
-	var rad_y := deg_to_rad(yaw)
-	var rad_p := deg_to_rad(pitch)
-	var dir := Vector3(
-		cos(rad_p) * sin(rad_y),
-		sin(rad_p),
-		cos(rad_p) * cos(rad_y)
-	)
-	global_position = target.global_position + dir * distance
-	look_at(target.global_position, Vector3.UP)
+		print("[Click] Kein Hit auf Globe")

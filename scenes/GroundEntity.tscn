@@ -2,5 +2,17 @@
 
 [ext_resource type="Script" uid="uid://dtfx7i3hqovlu" path="res://scripts/GroundEntity.gd" id="1_ikcom"]
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_GroundEntity"]
+size = Vector3(2.2, 2.2, 2.2)
+
 [node name="GroundEntity" type="Node3D" unique_id=1233187913]
 script = ExtResource("1_ikcom")
+
+[node name="CollisionArea" type="Area3D" parent="."]
+collision_layer = 1
+collision_mask = 1
+monitoring = true
+monitorable = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="CollisionArea"]
+shape = SubResource("BoxShape3D_GroundEntity")
