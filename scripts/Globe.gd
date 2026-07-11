@@ -13,6 +13,7 @@ const SURFACE_LIFT := 1.002
 @export var city_color: Color = Color(1.0, 1.0, 1.0)
 
 var state_data: Dictionary = {}
+var state_polygons: Dictionary = {}   # state_id -> Array of PackedVector2Array (lon, lat in degrees)
 
 func _ready() -> void:
 	load_state_data()
@@ -121,6 +122,17 @@ func create_states() -> void:
 
 		var vertices := PackedVector3Array()
 		_add_geometry(feature.get("geometry", {}), vertices)
+
+		# Store polygon for land check (only outer ring)
+		if feature.get("geometry", {}).get("type") in ["Polygon", "MultiPolygon"]:
+			var rings := []
+			if feature["geometry"]["type"] == "Polygon":
+				rings = feature["geometry"]["coordinates"]
+			else:
+				rings = feature["geometry"]["coordinates"][0] if feature["geometry"]["coordinates"].size() > 0 else []
+			if rings.size() > 0:
+				state_polygons[state_id] = rings[0]   # outer ring as Array of [lon, lat]
+
 		if vertices.is_empty(): continue
 
 		var center := Vector3.ZERO
@@ -197,21 +209,36 @@ func create_cities() -> void:
 
 	add_child(mi)
 
-# Strenge Land-Prüfung für Ground Entities
+# Echte Land-Prüfung: Ist der Punkt innerhalb eines State-Polygons?
 func is_position_on_land(world_pos: Vector3) -> bool:
 	if world_pos.length() < 1.0:
 		return false
 
-	var min_dist: float = 999999.0
-	for child in get_children():
-		if child is MeshInstance3D:
-			if child.name.begins_with("State_") or child.name.begins_with("Political_"):
-				var dist: float = child.global_position.distance_to(world_pos)
-				if dist < min_dist:
-					min_dist = dist
+	# Weltposition -> lat/lon umrechnen
+	var pos_normalized := world_pos.normalized()
+	var lat := rad_to_deg(asin(pos_normalized.y))
+	var lon := rad_to_deg(atan2(pos_normalized.x, pos_normalized.z))
 
-	# Deutlich strenger für Ground Entities (weniger Toleranz für Wasser)
-	return min_dist < 55.0
+	for state_id in state_polygons:
+		var ring: Array = state_polygons[state_id]
+		if _point_in_polygon(lon, lat, ring):
+			return true
+
+	return false
+
+func _point_in_polygon(lon: float, lat: float, ring: Array) -> bool:
+	var inside := false
+	var j := ring.size() - 1
+	for i in range(ring.size()):
+		var xi := float(ring[i][0])
+		var yi := float(ring[i][1])
+		var xj := float(ring[j][0])
+		var yj := float(ring[j][1])
+
+		if ((yi > lat) != (yj > lat)) and (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi if yj != yi else xi):
+			inside = not inside
+		j = i
+	return inside
 
 func _add_geometry(geom: Dictionary, vertices: PackedVector3Array) -> void:
 	if not geom.has("type") or not geom.has("coordinates"): return
