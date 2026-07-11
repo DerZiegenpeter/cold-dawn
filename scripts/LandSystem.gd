@@ -30,11 +30,11 @@ func is_position_on_land(world_pos: Vector3) -> bool:
 		return false
 
 	# Broad Phase
-	var min_dist := 999999.0
-	var closest_id := -1
+	var min_dist: float = 999999.0
+	var closest_id: int = -1
 
 	for id in _state_ids:
-		var dist := state_centers[id].distance_to(world_pos)
+		var dist: float = state_centers[id].distance_to(world_pos)
 		if dist < min_dist:
 			min_dist = dist
 			closest_id = id
