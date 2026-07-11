@@ -3,9 +3,8 @@ class_name GroundEntity
 
 ## Ground Entity
 ## - Flache Seite auf Oberfläche (wireframe cube)
-## - Collision jetzt in der Scene definiert (Area3D + BoxShape3D size 2.2 passend zur Entity-Größe)
-## - Kollision mit anderen GroundEntities wird aktiv aufgelöst (kein Überlappen mehr)
-## - Einheiten können nicht mehr außerhalb von States (auf Wasser) bewegt werden (Gate in Camera + Validierung)
+## - Collision jetzt in der Scene definiert (Area3D + BoxShape3D size 2.2)
+## - Aktive Kollisionsauflösung zwischen GroundEntities (kein Überlappen)
 
 signal moved(new_pos: Vector3)
 
@@ -18,7 +17,9 @@ var collision_area: Area3D = null
 var target_pos: Vector3 = Vector3.ZERO
 
 const ENTITY_SIZE := 2.2
-const COLLISION_RADIUS := 2.8  # Etwas Puffer für Separation
+const SEPARATION_RADIUS := 3.8
+
+const SEPARATION_FORCE := 2.5
 
 func _ready() -> void:
 	_create_visual()
@@ -74,13 +75,10 @@ func _create_visual() -> void:
 	add_child(mesh_instance)
 
 func _setup_collision_from_scene_or_create() -> void:
-	# Priorität: Collision aus der Scene verwenden (wie gewünscht "in der scene für ground entities")
 	if has_node("CollisionArea"):
 		collision_area = get_node("CollisionArea")
-		print("[GroundEntity] CollisionArea aus Scene geladen (Größe passend zur Entity)")
 		return
 
-	# Fallback: dynamisch erzeugen (für alte Scenes ohne Node)
 	if collision_area != null:
 		return
 
@@ -99,10 +97,9 @@ func _setup_collision_from_scene_or_create() -> void:
 
 	collision_area.add_child(shape_node)
 	add_child(collision_area)
-	print("[GroundEntity] CollisionArea dynamisch erstellt (Fallback)")
 
 func _process(delta: float) -> void:
-	_resolve_entity_collisions()  # NEU: Aktive Kollisionsauflösung zwischen GroundEntities
+	_resolve_entity_collisions()
 
 	if target_pos == Vector3.ZERO:
 		return
@@ -118,7 +115,7 @@ func _process(delta: float) -> void:
 		global_position = target_pos
 		target_pos = Vector3.ZERO
 		_orient_to_surface()
-		_resolve_entity_collisions()  # Nach Ankunft nochmal prüfen
+		_resolve_entity_collisions()
 		return
 
 	var t: float = step / angle
@@ -129,39 +126,36 @@ func _process(delta: float) -> void:
 	_orient_to_surface()
 
 func _resolve_entity_collisions() -> void:
-	# Einfache Separation: GroundEntities stoßen sich gegenseitig ab (kein Überlappen)
 	if not is_instance_valid(self) or global_position.length() < 1.0:
 		return
 
-	var others = []
-	if Engine.has_singleton("UnitManager"):
-		others = UnitManager.active_entities
+	if not UnitManager:
+		return
 
-	for other in others:
+	for other in UnitManager.active_entities:
 		if other == self or not is_instance_valid(other) or not other is GroundEntity:
 			continue
 		if other.global_position.length() < 1.0:
 			continue
 
-		var diff: Vector3 = global_position - other.global_position
-		var dist: float = diff.length()
-		if dist < 0.001 or dist > COLLISION_RADIUS * 2.0:
+		var diff := global_position - other.global_position
+		var dist := diff.length()
+
+		if dist < 0.05 or dist > SEPARATION_RADIUS:
 			continue
 
-		# Separation force (stärker wenn näher)
-		var push_strength: float = (COLLISION_RADIUS * 2.0 - dist) * 0.6
-		var push_dir: Vector3 = diff.normalized() * push_strength
+		var push_dir := diff.normalized()
+		var force := (SEPARATION_RADIUS - dist) * SEPARATION_FORCE
 
-		# Auf Sphere bleiben: nur tangential verschieben (nicht radial)
-		var normal: Vector3 = global_position.normalized()
-		var tangential: Vector3 = push_dir - push_dir.dot(normal) * normal
+		var normal := global_position.normalized()
+		var tangential := (push_dir - push_dir.dot(normal) * normal) * force * 0.7
 
-		global_position += tangential * 0.5  # Sanft anwenden
-		# Optional: auch anderen leicht zurückschieben (symmetrisch)
+		global_position += tangential
+
 		if is_instance_valid(other):
-			var other_normal: Vector3 = other.global_position.normalized()
-			var other_tang: Vector3 = -tangential - (-tangential).dot(other_normal) * other_normal
-			other.global_position += other_tang * 0.25
+			var other_normal := other.global_position.normalized()
+			var other_tang := (-push_dir - (-push_dir).dot(other_normal) * other_normal) * force * 0.35
+			other.global_position += other_tang
 
 		_orient_to_surface()
 
