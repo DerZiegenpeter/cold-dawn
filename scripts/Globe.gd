@@ -22,12 +22,17 @@ func _ready() -> void:
 	create_states()
 	create_cities()
 
-	# Neue Systeme initialisieren
 	LandSystem.initialize_from_globe(self)
 	UnitManager.initialize(self)
 	UnitManager.load_and_spawn_oob()
 
 	print("Cold Dawn Globe ready!")
+
+func get_state_polygons() -> Dictionary:
+	return state_polygons
+
+func get_state_centers() -> Dictionary:
+	return state_centers
 
 func load_state_data() -> void:
 	var path := "res://data/states.json"
@@ -36,8 +41,7 @@ func load_state_data() -> void:
 	var json := JSON.new()
 	if json.parse(file.get_as_text()) == OK:
 		for state in json.data:
-			var sid := int(state["id"])
-			state_data[sid] = state
+			state_data[int(state["id"])] = state
 	file.close()
 
 func create_states() -> void:
@@ -54,17 +58,15 @@ func create_states() -> void:
 		var vertices := PackedVector3Array()
 		_add_geometry(feature.get("geometry", {}), vertices)
 
-		# Polygon-Daten für LandSystem speichern
 		if feature.get("geometry", {}).get("type") in ["Polygon", "MultiPolygon"]:
 			var coords = feature["geometry"]["coordinates"]
-			var outer_ring := []
+			var outer := []
 			if feature["geometry"]["type"] == "Polygon" and coords.size() > 0:
-				outer_ring = coords[0]
-			elif feature["geometry"]["type"] == "MultiPolygon" and coords.size() > 0 and coords[0].size() > 0:
-				outer_ring = coords[0][0]
-
-			if outer_ring.size() > 0:
-				state_polygons[state_id] = outer_ring
+				outer = coords[0]
+			elif feature["geometry"]["type"] == "MultiPolygon" and coords.size() > 0:
+				outer = coords[0][0] if coords[0].size() > 0 else []
+			if outer.size() > 0:
+				state_polygons[state_id] = outer
 
 		if vertices.is_empty(): continue
 
@@ -77,15 +79,15 @@ func create_states() -> void:
 
 		state_centers[state_id] = center
 
-		var local_vertices := PackedVector3Array()
-		local_vertices.resize(vertices.size())
+		var local := PackedVector3Array()
+		local.resize(vertices.size())
 		for i in range(vertices.size()):
-			local_vertices[i] = vertices[i] - center
+			local[i] = vertices[i] - center
 
 		var mesh := ArrayMesh.new()
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)
-		arrays[Mesh.ARRAY_VERTEX] = local_vertices
+		arrays[Mesh.ARRAY_VERTEX] = local
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
 
 		var mi := MeshInstance3D.new()

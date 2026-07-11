@@ -84,14 +84,9 @@ func _setup_collision_from_scene_or_create() -> void:
 	add_child(collision_area)
 
 func _process(delta: float) -> void:
-	# CollisionSystem übernimmt Separation
 	if CollisionSystem:
 		CollisionSystem.resolve_collisions(UnitManager.active_entities)
 
-	var globe = get_globe()
-	if not globe: return
-
-	# Land-Validierung via LandSystem
 	if LandSystem and not LandSystem.is_position_on_land(global_position):
 		global_position = last_valid_pos
 		target_pos = Vector3.ZERO
@@ -101,7 +96,6 @@ func _process(delta: float) -> void:
 		last_valid_pos = global_position
 		return
 
-	# Bewegung
 	var current_dir := global_position.normalized()
 	var target_dir := target_pos.normalized()
 	var angle := current_dir.angle_to(target_dir)
@@ -126,8 +120,8 @@ func _process(delta: float) -> void:
 
 	_orient_to_surface()
 
-func get_globe() -> Globe:
-	return get_parent() as Globe
+func get_globe() -> Node:
+	return get_parent()
 
 func _orient_to_surface() -> void:
 	if not mesh_instance: return
