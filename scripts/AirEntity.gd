@@ -1,10 +1,6 @@
 extends Node3D
 class_name AirEntity
 
-## Air Entity
-## - Wie Ground, aber mit GERADE KANTE nach unten (Diamond / Raute von der Seite)
-## - Leicht erhöht
-
 signal moved(new_pos: Vector3)
 
 var data: Dictionary = {}
@@ -14,12 +10,13 @@ var is_selected: bool = false
 var mesh_instance: MeshInstance3D = null
 var target_pos: Vector3 = Vector3.ZERO
 
+const ENTITY_SIZE := 2.2
+
 func _ready() -> void:
 	_create_visual()
 
 func _create_visual() -> void:
-	if mesh_instance != null:
-		return
+	if mesh_instance != null: return
 
 	mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = "Visual"
@@ -30,14 +27,12 @@ func _create_visual() -> void:
 
 	var vertices := PackedVector3Array()
 	var indices := PackedInt32Array()
-
-	var s := 2.2
+	var s := ENTITY_SIZE
 
 	vertices.push_back(Vector3(-s/2, -s/2, -s/2))
 	vertices.push_back(Vector3( s/2, -s/2, -s/2))
 	vertices.push_back(Vector3( s/2,  s/2, -s/2))
 	vertices.push_back(Vector3(-s/2,  s/2, -s/2))
-
 	vertices.push_back(Vector3(-s/2, -s/2,  s/2))
 	vertices.push_back(Vector3( s/2, -s/2,  s/2))
 	vertices.push_back(Vector3( s/2,  s/2,  s/2))
@@ -70,12 +65,11 @@ func _process(delta: float) -> void:
 	if target_pos == Vector3.ZERO:
 		return
 
-	var current_dir: Vector3 = global_position.normalized()
-	var target_dir: Vector3 = target_pos.normalized()
-	var angle: float = current_dir.angle_to(target_dir)
+	var current_dir := global_position.normalized()
+	var target_dir := target_pos.normalized()
+	var angle := current_dir.angle_to(target_dir)
 
-	var angular_speed: float = 0.05
-	var step: float = angular_speed * delta
+	var step := 0.05 * delta
 
 	if angle <= step:
 		global_position = target_pos
@@ -83,36 +77,23 @@ func _process(delta: float) -> void:
 		_orient_to_surface()
 		return
 
-	var t: float = step / angle
-	var new_dir: Vector3 = current_dir.slerp(target_dir, t)
-
-	var radius: float = global_position.length()
-	global_position = new_dir * radius
+	var t := step / angle
+	var new_dir := current_dir.slerp(target_dir, t)
+	global_position = new_dir * global_position.length()
 	_orient_to_surface()
 
 func _orient_to_surface() -> void:
-	if mesh_instance == null:
-		return
-	if global_position.length_squared() < 1.0:
-		return
-	var normal: Vector3 = global_position.normalized()
-	if normal.length_squared() < 0.0001:
-		return
-
-	# Basis wie Ground (flache Seite zum Mittelpunkt)
+	if not mesh_instance: return
+	var normal := global_position.normalized()
+	if normal.length_squared() < 0.0001: return
 	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
-
-	# Extra Rotationen, damit die GERADE KANTE nach unten zeigt (Diamond/Raute wie im Bild oben)
 	mesh_instance.rotate_object_local(Vector3.RIGHT, deg_to_rad(45))
 	mesh_instance.rotate_object_local(Vector3.FORWARD, deg_to_rad(45))
 
 func set_data(entry: Dictionary, color: Color) -> void:
 	data = entry
 	nation_color = color
-
-	if mesh_instance == null:
-		_create_visual()
-
+	if not mesh_instance: _create_visual()
 	_update_visual()
 	_orient_to_surface()
 
@@ -121,28 +102,19 @@ func set_selected(selected: bool) -> void:
 	_update_visual()
 
 func move_to(world_pos: Vector3) -> void:
-	var s: float = 2.2
-	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 1.8)
-	target_pos = lifted
+	# Air Entities dürfen über Wasser fliegen -> kein Land-Check
+	var s := ENTITY_SIZE
+	target_pos = world_pos.normalized() * (world_pos.length() + s * 1.8)
 
 func update_fade(alpha: float) -> void:
-	if mesh_instance == null:
-		return
+	if not mesh_instance: return
 	var mat := mesh_instance.material_override as StandardMaterial3D
-	if mat == null:
-		return
-
-	var col := mat.albedo_color
-	col.a = alpha
-	mat.albedo_color = col
+	if mat: mat.albedo_color.a = alpha
 
 func _update_visual() -> void:
-	if mesh_instance == null:
-		return
-
+	if not mesh_instance: return
 	var mat := mesh_instance.material_override as StandardMaterial3D
-	if mat == null:
-		return
+	if not mat: return
 
 	if is_selected:
 		mat.albedo_color = nation_color.lightened(0.5)
