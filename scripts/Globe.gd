@@ -197,7 +197,7 @@ func create_cities() -> void:
 
 	add_child(mi)
 
-# NEU: Zentrale Land-Prüfung für GroundEntities und Kamera
+# Strenge Land-Prüfung für Ground Entities
 func is_position_on_land(world_pos: Vector3) -> bool:
 	if world_pos.length() < 1.0:
 		return false
@@ -210,9 +210,8 @@ func is_position_on_land(world_pos: Vector3) -> bool:
 				if dist < min_dist:
 					min_dist = dist
 
-	# Deutlich strengerer Check + großer Puffer für kleine Staaten
-	# Ground Entities dürfen NUR auf States sein, nie auf Wasser
-	return min_dist < 95.0
+	# Deutlich strenger für Ground Entities (weniger Toleranz für Wasser)
+	return min_dist < 55.0
 
 func _add_geometry(geom: Dictionary, vertices: PackedVector3Array) -> void:
 	if not geom.has("type") or not geom.has("coordinates"): return
