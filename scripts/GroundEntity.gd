@@ -3,8 +3,7 @@ class_name GroundEntity
 
 ## Ground Entity
 ## - Steht mit FLACHER SEITE auf der Oberfläche
-## - Hat echte Collision in seinen visuellen Grenzen
-## - Gehört zu einer Nation (owner)
+## - Hat echte Collision (Area3D + Box) die sofort in der Szene existiert
 
 signal moved(new_pos: Vector3)
 
@@ -13,7 +12,7 @@ var nation_color: Color = Color(0.6, 0.6, 0.6)
 var is_selected: bool = false
 
 var mesh_instance: MeshInstance3D = null
-var area: Area3D = null
+var collision_area: Area3D = null
 var target_pos: Vector3 = Vector3.ZERO
 
 func _ready() -> void:
@@ -70,22 +69,19 @@ func _create_visual() -> void:
 	add_child(mesh_instance)
 
 func _create_collision() -> void:
-	if area != null:
+	if collision_area != null:
 		return
 
-	area = Area3D.new()
-	area.name = "CollisionArea"
-	area.monitoring = true
-	area.monitorable = true
+	collision_area = Area3D.new()
+	collision_area.name = "CollisionArea"
 
-	var collision_shape := CollisionShape3D.new()
+	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	var s := 2.2
-	box.size = Vector3(s, s, s)
-	collision_shape.shape = box
+	box.size = Vector3(2.2, 2.2, 2.2)
+	shape.shape = box
 
-	area.add_child(collision_shape)
-	add_child(area)
+	collision_area.add_child(shape)
+	add_child(collision_area)
 
 func _process(delta: float) -> void:
 	if target_pos == Vector3.ZERO:
@@ -128,6 +124,8 @@ func set_data(entry: Dictionary, color: Color) -> void:
 
 	if mesh_instance == null:
 		_create_visual()
+	if collision_area == null:
+		_create_collision()
 
 	_update_visual()
 	_orient_to_surface()
