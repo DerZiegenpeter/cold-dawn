@@ -59,7 +59,7 @@ func _input(event: InputEvent) -> void:
 		var delta: Vector2 = event.position - last_mouse_pos
 		var current_sens: float = sensitivity * clampf(distance / 1100.0, 0.25, 1.0)
 		target_yaw += delta.x * current_sens
-		target_pitch -= delta.y * current_sens
+		target_pitch += delta.y * current_sens   # Angepasst nach User-Feedback
 		last_mouse_pos = event.position
 
 func _process(delta: float) -> void:
