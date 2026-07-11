@@ -137,28 +137,28 @@ func create_states() -> void:
 
 		var mesh := ArrayMesh.new()
 		var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = local_vertices
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = local_vertices
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
 
-	var mi := MeshInstance3D.new()
-	mi.name = "State_" + str(state_id)
-	mi.mesh = mesh
-	mi.position = center
+		var mi := MeshInstance3D.new()
+		mi.name = "State_" + str(state_id)
+		mi.mesh = mesh
+		mi.position = center
 
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = state_color
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.emission_enabled = true
-	mat.emission = state_color
-	mat.emission_energy_multiplier = state_emission_energy
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.render_priority = 8
-	mat.albedo_color.a = 0.0
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = state_color
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.emission_enabled = true
+		mat.emission = state_color
+		mat.emission_energy_multiplier = state_emission_energy
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.render_priority = 8
+		mat.albedo_color.a = 0.0
 
-	mi.material_override = mat
-	add_child(mi)
-	created += 1
+		mi.material_override = mat
+		add_child(mi)
+		created += 1
 
 	print("States erstellt: ", created, " | Ohne perfektes Daten-Match: ", no_data)
 
