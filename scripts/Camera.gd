@@ -81,7 +81,6 @@ func _update_position() -> void:
 	global_position = target.global_position + dir * distance
 	look_at(target.global_position, Vector3.UP)
 
-# === LOD / Fading ===
 func _fade_coastlines() -> void:
 	var coast := globe.get_node_or_null("Coastlines")
 	if not coast: return
@@ -149,12 +148,22 @@ func _handle_left_click() -> void:
 
 func _handle_right_click() -> void:
 	if not UnitManager.selected_entity: return
+
 	var mouse_pos := get_viewport().get_mouse_position()
 	var from := project_ray_origin(mouse_pos)
 	var dir := project_ray_normal(mouse_pos)
 	var hit_pos := _raycast_to_globe_sphere(from, dir)
+
 	if hit_pos != Vector3.ZERO:
-		if LandSystem and LandSystem.is_position_on_land(hit_pos):
+		var selected = UnitManager.selected_entity
+		var allow_move := true
+
+		# Nur GroundEntities sind auf Land beschränkt
+		if selected is GroundEntity:
+			if not (LandSystem and LandSystem.is_position_on_land(hit_pos)):
+				allow_move = false
+
+		if allow_move:
 			UnitManager.move_selected_to(hit_pos)
 		else:
 			print("[Movement] Nur auf Land/States erlaubt!")
