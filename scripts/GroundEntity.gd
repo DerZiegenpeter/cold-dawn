@@ -2,10 +2,8 @@ extends Node3D
 class_name GroundEntity
 
 ## Ground Entity
-## - Wireframe Würfel
-## - Steht immer exakt mit flacher Seite auf der Oberfläche (Raute-Optik durch 45°)
-## - Konstante Geschwindigkeit, kein Abbremsen/Anfahren, kein End-Wackeln
-## - Ground nur auf Land (wird beim Befehl geprüft)
+## - Steht mit FLACHER SEITE auf der Oberfläche (Rechteck-Optik von der Seite)
+## - Konstante Geschwindigkeit, immer perfekt ausgerichtet
 
 signal moved(new_pos: Vector3)
 
@@ -76,8 +74,7 @@ func _process(delta: float) -> void:
 	var target_dir: Vector3 = target_pos.normalized()
 	var angle: float = current_dir.angle_to(target_dir)
 
-	# Konstante Winkelgeschwindigkeit - kein Abbremsen, kein End-Sprint/Wackeln
-	var angular_speed: float = 0.04  # bei Bedarf anpassen (0.03 = sehr langsam, 0.06 = flotter)
+	var angular_speed: float = 0.04
 	var step: float = angular_speed * delta
 
 	if angle <= step:
@@ -91,7 +88,7 @@ func _process(delta: float) -> void:
 
 	var radius: float = global_position.length()
 	global_position = new_dir * radius
-	_orient_to_surface()   # immer perfekt zur Oberfläche ausrichten (auch während der Bewegung auf der Kugel)
+	_orient_to_surface()
 
 func _orient_to_surface() -> void:
 	if mesh_instance == null:
@@ -102,11 +99,11 @@ func _orient_to_surface() -> void:
 	if normal.length_squared() < 0.0001:
 		return
 
-	# Flache Seite zum Globus-Mittelpunkt (ganze Seite "unten")
+	# Nur looking_at → flache Seite exakt zum Globus-Mittelpunkt
+	# Dadurch sieht es von der Seite wie ein Rechteck aus, das flach auf der Oberfläche steht (wie in deinem Bild)
 	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
 
-	# 45° Roll für schöne Raute-Optik (Rechteck geneigt)
-	mesh_instance.rotate_object_local(Vector3.FORWARD, deg_to_rad(45))
+	# KEINE extra 45° Rotation mehr bei Ground → bleibt rechteckig statt Raute
 
 func set_data(entry: Dictionary, color: Color) -> void:
 	data = entry
@@ -124,7 +121,6 @@ func set_selected(selected: bool) -> void:
 
 func move_to(world_pos: Vector3) -> void:
 	var s: float = 2.2
-	# Exakt mit unterer Seite auf der Oberfläche
 	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 0.5)
 	target_pos = lifted
 

@@ -2,9 +2,8 @@ extends Node3D
 class_name AirEntity
 
 ## Air Entity
-## - Sieht aus wie GroundEntity, aber mit KANTE nach unten (nicht flache Seite)
+## - Wie Ground, aber mit GERADE KANTE nach unten (Diamond / Raute von der Seite)
 ## - Leicht erhöht
-## - Gleiche konstante Bewegung wie Ground
 
 signal moved(new_pos: Vector3)
 
@@ -32,7 +31,7 @@ func _create_visual() -> void:
 	var vertices := PackedVector3Array()
 	var indices := PackedInt32Array()
 
-	var s := 2.2   # jetzt exakt wie Ground für "genau wie die Ground Entities aussehen"
+	var s := 2.2
 
 	vertices.push_back(Vector3(-s/2, -s/2, -s/2))
 	vertices.push_back(Vector3( s/2, -s/2, -s/2))
@@ -75,8 +74,7 @@ func _process(delta: float) -> void:
 	var target_dir: Vector3 = target_pos.normalized()
 	var angle: float = current_dir.angle_to(target_dir)
 
-	# GENAU dieselbe konstante Bewegung wie bei GroundEntity
-	var angular_speed: float = 0.05  # etwas flotter als Ground (Air soll schneller wirken)
+	var angular_speed: float = 0.05
 	var step: float = angular_speed * delta
 
 	if angle <= step:
@@ -101,12 +99,12 @@ func _orient_to_surface() -> void:
 	if normal.length_squared() < 0.0001:
 		return
 
-	# Basis wie bei Ground (flache Seite zum Mittelpunkt + Raute-Roll)
+	# Basis wie Ground (flache Seite zum Mittelpunkt)
 	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
-	mesh_instance.rotate_object_local(Vector3.FORWARD, deg_to_rad(45))
 
-	# ZUSÄTZLICH geneigt, damit die GERADE KANTE nach unten zeigt (nicht die flache Seite)
+	# Extra Rotationen, damit die GERADE KANTE nach unten zeigt (Diamond/Raute wie im Bild oben)
 	mesh_instance.rotate_object_local(Vector3.RIGHT, deg_to_rad(45))
+	mesh_instance.rotate_object_local(Vector3.FORWARD, deg_to_rad(45))
 
 func set_data(entry: Dictionary, color: Color) -> void:
 	data = entry
@@ -124,7 +122,6 @@ func set_selected(selected: bool) -> void:
 
 func move_to(world_pos: Vector3) -> void:
 	var s: float = 2.2
-	# Leicht erhöht (Air schwebt)
 	var lifted: Vector3 = world_pos.normalized() * (world_pos.length() + s * 1.8)
 	target_pos = lifted
 
