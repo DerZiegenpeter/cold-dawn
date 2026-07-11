@@ -167,11 +167,11 @@ func _is_on_land(world_pos: Vector3) -> bool:
 	if not globe:
 		return true
 
-	var min_dist := 999999.0
+	var min_dist: float = 999999.0
 	for child in globe.get_children():
 		if child is MeshInstance3D:
 			if child.name.begins_with("State_") or child.name.begins_with("Political_"):
-				var dist := child.global_position.distance_to(world_pos)
+				var dist: float = child.global_position.distance_to(world_pos)
 				if dist < min_dist:
 					min_dist = dist
 
@@ -218,13 +218,13 @@ func _try_select_state() -> void:
 	var dir := project_ray_normal(mouse_pos)
 
 	var closest_state: Node3D = null
-	var closest_dist := 999999.0
+	var closest_dist: float = 999999.0
 
 	for child in globe.get_children():
 		if child is MeshInstance3D and child.name.begins_with("State_"):
 			var to_state: Vector3 = (child.global_position - from).normalized()
-			var dist := from.distance_to(child.global_position)
-			var angle := dir.dot(to_state)
+			var dist: float = from.distance_to(child.global_position)
+			var angle: float = dir.dot(to_state)
 
 			if angle > 0.98 and dist < closest_dist:
 				closest_dist = dist
