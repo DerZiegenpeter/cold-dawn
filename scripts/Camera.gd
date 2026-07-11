@@ -75,6 +75,17 @@ func _process(delta: float) -> void:
 		_fade_cities()
 		_fade_ground_entities()
 
+func _update_position() -> void:
+	if not target:
+		return
+	var dir := Vector3(
+		cos(deg_to_rad(yaw)) * cos(deg_to_rad(pitch)),
+		sin(deg_to_rad(pitch)),
+		sin(deg_to_rad(yaw)) * cos(deg_to_rad(pitch))
+	).normalized()
+	global_position = target.global_position + dir * distance
+	look_at(target.global_position, Vector3.UP)
+
 func _fade_coastlines() -> void:
 	var coast := globe.get_node_or_null("Coastlines")
 	if not coast: return
