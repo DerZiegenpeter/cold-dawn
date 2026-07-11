@@ -17,6 +17,9 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 [autoload]
 
 UnitManager="*res://scripts/UnitManager.gd"
+LandSystem="*res://scripts/LandSystem.gd"
+MovementSystem="*res://scripts/MovementSystem.gd"
+CollisionSystem="*res://scripts/CollisionSystem.gd"
 
 [display]
 
