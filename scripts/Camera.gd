@@ -175,7 +175,8 @@ func _is_on_land(world_pos: Vector3) -> bool:
 				if dist < min_dist:
 					min_dist = dist
 
-	return min_dist < 38.0
+	# Strengere Land-Prüfung
+	return min_dist < 32.0
 
 func _did_hit_anything(mouse_pos: Vector2) -> bool:
 	var entity = UnitManager.get_entity_at_mouse(mouse_pos, self)

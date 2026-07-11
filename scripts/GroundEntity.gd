@@ -2,8 +2,9 @@ extends Node3D
 class_name GroundEntity
 
 ## Ground Entity
-## - Steht mit FLACHER SEITE auf der Oberfläche
-## - Hat echte Collision (Area3D + Box) die sofort in der Szene existiert
+## - Flache Seite auf Oberfläche
+## - Unsichtbare aber funktionsfähige Collision (Area3D + BoxShape)
+## - Kollidiert nicht mit anderen Entities (nur für Interaktionen)
 
 signal moved(new_pos: Vector3)
 
@@ -74,6 +75,8 @@ func _create_collision() -> void:
 
 	collision_area = Area3D.new()
 	collision_area.name = "CollisionArea"
+	collision_area.collision_layer = 1
+	collision_area.collision_mask = 1
 
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
