@@ -58,14 +58,14 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and is_dragging:
 		var delta: Vector2 = event.position - last_mouse_pos
 		var current_sens: float = sensitivity * clampf(distance / 1100.0, 0.25, 1.0)
-		target_yaw   -= delta.x * current_sens
-		 target_pitch = clamp(target_pitch + delta.y * current_sens, -80, 80)
+		target_yaw -= delta.x * current_sens
+		target_pitch = clamp(target_pitch + delta.y * current_sens, -80, 80)
 		last_mouse_pos = event.position
 
 func _process(delta: float) -> void:
 	var t: float = clampf(smoothness * delta, 0.0, 1.0)
-	yaw      = lerp(yaw, target_yaw, t)
-	pitch    = lerp(pitch, target_pitch, t)
+	yaw = lerp(yaw, target_yaw, t)
+	pitch = lerp(pitch, target_pitch, t)
 	distance = lerp(distance, target_distance, t * 0.65)
 	_update_position()
 
