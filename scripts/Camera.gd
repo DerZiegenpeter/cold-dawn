@@ -58,8 +58,8 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and is_dragging:
 		var delta: Vector2 = event.position - last_mouse_pos
 		var current_sens: float = sensitivity * clampf(distance / 1100.0, 0.25, 1.0)
-		target_yaw -= delta.x * current_sens
-		target_pitch = clamp(target_pitch + delta.y * current_sens, -80, 80)
+		target_yaw += delta.x * current_sens          # Angepasst (besserer Drag)
+		target_pitch -= delta.y * current_sens        # Angepasst (natürlicher Pitch)
 		last_mouse_pos = event.position
 
 func _process(delta: float) -> void:
@@ -172,7 +172,7 @@ func _handle_right_click() -> void:
 		if _is_on_land(hit_pos):
 			UnitManager.move_selected_to(hit_pos)
 		else:
-			print("[Movement] Nur auf Land/States erlaubt! (Klick zu weit von State-Center)")
+			print("[Movement] Nur auf Land/States erlaubt!")
 
 func _is_on_land(world_pos: Vector3) -> bool:
 	if not globe:
@@ -186,9 +186,8 @@ func _is_on_land(world_pos: Vector3) -> bool:
 				if dist < min_dist:
 					min_dist = dist
 
-	# Verbesserte Land-Prüfung (größerer Threshold für kleine States wie NL, dennoch Wasser weitgehend blockiert)
-	# TODO: Für perfekte Lösung Polygon-Containment aus states.geojson implementieren (point-in-spherical-polygon)
-	return min_dist < 65.0
+	# Verbesserte Land-Erkennung (größerer Radius + bessere Abdeckung kleiner Staaten)
+	return min_dist < 120.0
 
 func _did_hit_anything(mouse_pos: Vector2) -> bool:
 	var entity = UnitManager.get_entity_at_mouse(mouse_pos, self)
