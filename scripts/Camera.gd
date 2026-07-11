@@ -58,8 +58,8 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and is_dragging:
 		var delta: Vector2 = event.position - last_mouse_pos
 		var current_sens: float = sensitivity * clampf(distance / 1100.0, 0.25, 1.0)
-		target_yaw += delta.x * current_sens          # Angepasst (besserer Drag)
-		target_pitch -= delta.y * current_sens        # Angepasst (natürlicher Pitch)
+		target_yaw += delta.x * current_sens
+		target_pitch -= delta.y * current_sens
 		last_mouse_pos = event.position
 
 func _process(delta: float) -> void:
@@ -169,25 +169,10 @@ func _handle_right_click() -> void:
 
 	var hit_pos := _raycast_to_globe_sphere(from, dir)
 	if hit_pos != Vector3.ZERO:
-		if _is_on_land(hit_pos):
+		if globe and globe.is_position_on_land(hit_pos):
 			UnitManager.move_selected_to(hit_pos)
 		else:
 			print("[Movement] Nur auf Land/States erlaubt!")
-
-func _is_on_land(world_pos: Vector3) -> bool:
-	if not globe:
-		return true
-
-	var min_dist: float = 999999.0
-	for child in globe.get_children():
-		if child is MeshInstance3D:
-			if child.name.begins_with("State_") or child.name.begins_with("Political_"):
-				var dist: float = child.global_position.distance_to(world_pos)
-				if dist < min_dist:
-					min_dist = dist
-
-	# Verbesserte Land-Erkennung (größerer Radius + bessere Abdeckung kleiner Staaten)
-	return min_dist < 120.0
 
 func _did_hit_anything(mouse_pos: Vector2) -> bool:
 	var entity = UnitManager.get_entity_at_mouse(mouse_pos, self)
