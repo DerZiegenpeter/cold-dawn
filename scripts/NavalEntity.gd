@@ -54,7 +54,7 @@ func _create_visual() -> void:
 	# 12 edges (wireframe)
 	indices.append_array([0,1, 1,2, 2,3, 3,0])  # back face
 	indices.append_array([4,5, 5,6, 6,7, 7,4])  # front face
-	indices.append_array([0,4, 1,5, 2,6, 3,7])  # connecting edges
+	indices.append_array([0,4, 1,5, 2,6, 3,7])
 
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_INDEX] = indices
@@ -94,8 +94,9 @@ func _setup_collision_from_scene_or_create() -> void:
 	add_child(collision_area)
 
 func _process(delta: float) -> void:
-	if CollisionSystem:
-		CollisionSystem.resolve_collisions(UnitManager.active_entities)
+	# Collision is now handled centrally in UnitManager._process() for performance
+	# if CollisionSystem:
+	# 	CollisionSystem.resolve_collisions(UnitManager.active_entities)
 
 	# Naval: stay on water (not on land)
 	if LandSystem and LandSystem.is_position_on_land(global_position):

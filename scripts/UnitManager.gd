@@ -65,6 +65,11 @@ func load_and_spawn_oob(oob_path: String = "res://data/oob.json") -> void:
 
 	print("[UnitManager] ", active_entities.size(), " Entities gespawnt")
 
+func _process(delta: float) -> void:
+	# Central collision resolution - was previously called from EVERY entity every frame (O(n³) !)
+	if CollisionSystem:
+		CollisionSystem.resolve_collisions(active_entities)
+
 func _spawn_entity(entry: Dictionary) -> void:
 	var type: String = entry.get("type", "ground")
 
@@ -118,7 +123,8 @@ func select_entity(entity: Node) -> void:
 	selected_entity = entity
 	if entity.has_method("set_selected"):
 		entity.set_selected(true)
-	print("[UnitManager] Selected: ", entity.name if entity.has("name") else entity)
+	# Safe print (Node always has .name, no need for .has("name"))
+	print("[UnitManager] Selected: ", entity.name)
 
 func deselect() -> void:
 	if selected_entity and is_instance_valid(selected_entity) and selected_entity.has_method("set_selected"):

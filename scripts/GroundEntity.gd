@@ -84,8 +84,9 @@ func _setup_collision_from_scene_or_create() -> void:
 	add_child(collision_area)
 
 func _process(delta: float) -> void:
-	if CollisionSystem:
-		CollisionSystem.resolve_collisions(UnitManager.active_entities)
+	# Collision is now handled centrally in UnitManager._process() for performance
+	# if CollisionSystem:
+	# 	CollisionSystem.resolve_collisions(UnitManager.active_entities)
 
 	if LandSystem and not LandSystem.is_position_on_land(global_position):
 		global_position = last_valid_pos
