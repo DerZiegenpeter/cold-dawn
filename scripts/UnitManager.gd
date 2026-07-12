@@ -49,7 +49,7 @@ func load_and_spawn_oob(oob_path: String = "res://data/oob.json") -> void:
 		push_warning("[UnitManager] oob.json nicht gefunden")
 		return
 
-	var file := FileAccess.open(oob_path, FileAccess.READ)
+	var file := FileAccess.open(path, FileAccess.READ)
 	var text := file.get_as_text()
 	file.close()
 
@@ -162,13 +162,15 @@ func get_entity_at_mouse(mouse_pos: Vector2, cam: Camera3D) -> Node:
 	var result := space_state.intersect_ray(query)
 
 	if result and result.has("collider"):
-		var collider = result.collider
-		var parent := collider.get_parent() if collider else null
+		var collider: Object = result.collider
+		var parent: Node = collider.get_parent() if is_instance_valid(collider) else null
 		if parent and parent in active_entities:
 			return parent
-		# Sometimes collider is deeper
-		if parent and parent.get_parent() and parent.get_parent() in active_entities:
-			return parent.get_parent()
+		# Sometimes collider is deeper (CollisionArea is child of entity)
+		if parent:
+			var grandparent: Node = parent.get_parent()
+			if grandparent and grandparent in active_entities:
+				return grandparent
 
 	# Fallback for AirEntity (no CollisionArea) or missed hits: closest on screen
 	var closest: Node = null
