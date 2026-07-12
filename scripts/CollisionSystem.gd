@@ -1,6 +1,7 @@
 extends Node
 
 ## CollisionSystem
+## Handles separation between entities. Air entities do not collide/separate with Ground entities.
 
 @export var separation_radius := 3.8
 @export var separation_force := 2.8
@@ -16,6 +17,15 @@ func resolve_collisions(entities: Array) -> void:
 		for j in range(i + 1, count):
 			var b = entities[j]
 			if not is_instance_valid(b) or b.global_position.length() < 1.0: continue
+
+			# Skip collision between air and ground entities (air flies over ground units)
+			var type_a := _get_entity_type(a)
+			var type_b := _get_entity_type(b)
+			if (type_a == "air" and type_b == "ground") or (type_a == "ground" and type_b == "air"):
+				continue
+			# Optionally skip air-naval and ground-naval too for domain separation, but keeping minimal change:
+			# if (type_a == "air" and type_b == "naval") or (type_a == "naval" and type_b == "air"): continue
+			# if (type_a == "ground" and type_b == "naval") or (type_a == "naval" and type_b == "ground"): continue
 
 			var diff: Vector3 = a.global_position - b.global_position
 			var dist: float = diff.length()
@@ -33,3 +43,17 @@ func resolve_collisions(entities: Array) -> void:
 
 			if a.has_method("_orient_to_surface"): a._orient_to_surface()
 			if b.has_method("_orient_to_surface"): b._orient_to_surface()
+
+func _get_entity_type(entity: Node) -> String:
+	if entity == null:
+		return "unknown"
+		if entity.has("data") and entity.data is Dictionary and entity.data.has("type"):
+			return str(entity.data["type"])
+		# Fallback by class name
+		if entity is AirEntity:
+			return "air"
+		if entity is GroundEntity:
+			return "ground"
+		if entity is NavalEntity:
+			return "naval"
+		return "ground"  # default

@@ -21,32 +21,14 @@ func _create_visual() -> void:
 	mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = "Visual"
 
-	var mesh := ArrayMesh.new()
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
+	# Changed from wireframe cube to sphere for air entities
+	var sphere := SphereMesh.new()
+	sphere.radius = ENTITY_SIZE * 0.65
+	sphere.height = ENTITY_SIZE * 1.3
+	sphere.radial_segments = 24
+	sphere.rings = 12
 
-	var vertices := PackedVector3Array()
-	var indices := PackedInt32Array()
-	var s := ENTITY_SIZE
-
-	vertices.push_back(Vector3(-s/2, -s/2, -s/2))
-	vertices.push_back(Vector3( s/2, -s/2, -s/2))
-	vertices.push_back(Vector3( s/2,  s/2, -s/2))
-	vertices.push_back(Vector3(-s/2,  s/2, -s/2))
-	vertices.push_back(Vector3(-s/2, -s/2,  s/2))
-	vertices.push_back(Vector3( s/2, -s/2,  s/2))
-	vertices.push_back(Vector3( s/2,  s/2,  s/2))
-	vertices.push_back(Vector3(-s/2,  s/2,  s/2))
-
-	indices.append_array([0,1, 1,2, 2,3, 3,0])
-	indices.append_array([4,5, 5,6, 6,7, 7,4])
-	indices.append_array([0,4, 1,5, 2,6, 3,7])
-
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_INDEX] = indices
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
-
-	mesh_instance.mesh = mesh
+	mesh_instance.mesh = sphere
 
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -84,11 +66,11 @@ func _process(delta: float) -> void:
 
 func _orient_to_surface() -> void:
 	if not mesh_instance: return
+	# For sphere, simple outward orientation (no need for complex rotation like cube)
 	var normal := global_position.normalized()
 	if normal.length_squared() < 0.0001: return
+	# Sphere is symmetric, but we can still align if future needs (e.g. selection marker)
 	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
-	mesh_instance.rotate_object_local(Vector3.RIGHT, deg_to_rad(45))
-	mesh_instance.rotate_object_local(Vector3.FORWARD, deg_to_rad(45))
 
 func set_data(entry: Dictionary, color: Color) -> void:
 	data = entry
