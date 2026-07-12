@@ -70,5 +70,29 @@
 	"owner": "POL",
 	"type": "air",
 	"position": { "lat": 51.75, "lon": 19.45 }
+  },
+  {
+	"name": "1. Fregatte Ostsee",
+	"owner": "DEU",
+	"type": "naval",
+	"position": { "lat": 54.45, "lon": 13.25 }
+  },
+  {
+	"name": "2. Korvette Warnow",
+	"owner": "DEU",
+	"type": "naval",
+	"position": { "lat": 54.65, "lon": 12.85 }
+  },
+  {
+	"name": "1. Fregata Bałtyk",
+	"owner": "POL",
+	"type": "naval",
+	"position": { "lat": 54.55, "lon": 18.75 }
+  },
+  {
+	"name": "2. Korweta Gdańsk",
+	"owner": "POL",
+	"type": "naval",
+	"position": { "lat": 54.80, "lon": 17.50 }
   }
 ]

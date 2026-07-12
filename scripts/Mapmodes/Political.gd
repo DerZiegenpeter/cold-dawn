@@ -11,11 +11,16 @@ class_name PoliticalMap
 @export var render_priority: int = 15
 @export var emission_energy: float = 0.5
 @export var base_subdivision: int = 1          # Basis-Unterteilung
+@export var enabled: bool = false   # Deaktiviert per Default wegen langer Ladezeit (53MB states.geojson). Code bleibt erhalten!
 
 var _globe: Globe
 var _country_meshes: Dictionary = {}
 
 func _ready() -> void:
+	if not enabled:
+		print("PoliticalMap deaktiviert (Performance – Code bleibt erhalten, einfach enabled=true setzen oder im Inspector aktivieren)")
+		return
+
 	print("=== PoliticalMap gestartet ===")
 	_globe = get_node_or_null(globe_path)
 	if not _globe:
@@ -26,16 +31,16 @@ func _ready() -> void:
 
 func _create_batched_political_map() -> void:
 	clear_map()
-	
+
 	var nations := _load_json_array("res://data/nations.json")
 	if nations.is_empty():
 		push_warning("PoliticalMap: nations.json nicht gefunden!")
 		return
-	
+
 	var geo_data := _load_json_dict("res://data/geojson/states.geojson")
 	if geo_data.is_empty():
 		return
-	
+
 	# state_id → country_code Mapping
 	var state_to_country: Dictionary = {}
 	for nation in nations:
@@ -43,17 +48,17 @@ func _create_batched_political_map() -> void:
 		if code == "": continue
 		for sid in nation.get("states", []):
 			state_to_country[int(sid)] = code
-	
+
 	# States pro Land sammeln
 	var country_geometries: Dictionary = {}
 	for nation in nations:
 		var code := str(nation.get("id", ""))
 		if code != "":
 			country_geometries[code] = []
-	
+
 	var features: Array = geo_data.get("features", [])
 	var index := 0
-	
+
 	for feature in features:
 		index += 1
 		var state_id := index
@@ -62,10 +67,10 @@ func _create_batched_political_map() -> void:
 		if owner_code != "" and country_geometries.has(owner_code):
 			var rings := _extract_outer_rings(feature.get("geometry", {}))
 			country_geometries[owner_code].append_array(rings)
-	
+
 	# Pro Land ein Mesh erstellen
 	var created := 0
-	
+
 	for nation in nations:
 		var code := str(nation.get("id", ""))
 		if code == "" or not country_geometries.has(code):
@@ -82,7 +87,7 @@ func _create_batched_political_map() -> void:
 			_globe.add_child(mi)
 			_country_meshes[code] = mi
 			created += 1
-	
+
 	print("✅ PoliticalMap: ", created, " Länder als Meshes erstellt")
 
 func _get_color_from_nation(nation: Dictionary) -> Color:
@@ -96,7 +101,7 @@ func _create_country_mesh(rings: Array, color: Color, country_code: String) -> M
 	var mesh_indices := PackedInt32Array()
 	var vcount := 0
 	var radius := _globe.earth_radius * fill_radius_multiplier
-	
+
 	for ring in rings:
 		if ring.size() < 3: continue
 		
@@ -123,25 +128,25 @@ func _create_country_mesh(rings: Array, color: Color, country_code: String) -> M
 					mesh_indices.append(vcount)
 					vcount += 1
 			else:
-				for v in tri_verts:
-					mesh_verts.append(v)
-					mesh_indices.append(vcount)
-					vcount += 1
-	
+			for v in tri_verts:
+				mesh_verts.append(v)
+				mesh_indices.append(vcount)
+				vcount += 1
+
 	if mesh_verts.is_empty():
 		return null
-	
+
 	var mesh := ArrayMesh.new()
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = mesh_verts
 	arrays[Mesh.ARRAY_INDEX] = mesh_indices
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	
+
 	var mi := MeshInstance3D.new()
 	mi.name = "Political_" + country_code
 	mi.mesh = mesh
-	
+
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -152,30 +157,30 @@ func _create_country_mesh(rings: Array, color: Color, country_code: String) -> M
 	mat.render_priority = render_priority
 	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	
+
 	mi.material_override = mat
 	return mi
 
 func _subdivide_triangle(verts: Array[Vector3], level: int, radius: float) -> Array[Vector3]:
 	if level <= 0:
 		return verts
-	
+
 	var a: Vector3 = verts[0]
 	var b: Vector3 = verts[1]
 	var c: Vector3 = verts[2]
-	
+
 	var mab := ((a + b) * 0.5).normalized() * radius
 	var mbc := ((b + c) * 0.5).normalized() * radius
 	var mca := ((c + a) * 0.5).normalized() * radius
-	
+
 	var result: Array[Vector3] = []
-	
+
 	# 4 neue Dreiecke
 	result.append_array(_subdivide_triangle([a, mab, mca], level - 1, radius))
 	result.append_array(_subdivide_triangle([b, mbc, mab], level - 1, radius))
 	result.append_array(_subdivide_triangle([c, mca, mbc], level - 1, radius))
 	result.append_array(_subdivide_triangle([mab, mbc, mca], level - 1, radius))
-	
+
 	return result
 
 func clear_map() -> void:
@@ -229,5 +234,5 @@ func _extract_outer_rings(geom: Dictionary) -> Array[PackedVector2Array]:
 		"MultiPolygon":
 			for poly in geom.coordinates:
 				if poly.size() > 0:
-					rings.append(_coords_to_packed_vec2(poly[0]))
+				rings.append(_coords_to_packed_vec2(geom.coordinates[0]))
 	return rings
