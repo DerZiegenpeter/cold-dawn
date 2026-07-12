@@ -84,6 +84,18 @@
 	"position": { "lat": 54.65, "lon": 12.85 }
   },
   {
+	"name": "3. Fregatte Kiel",
+	"owner": "DEU",
+	"type": "naval",
+	"position": { "lat": 54.35, "lon": 10.15 }
+  },
+  {
+	"name": "4. Korvette Rostock",
+	"owner": "DEU",
+	"type": "naval",
+	"position": { "lat": 54.10, "lon": 12.10 }
+  },
+  {
 	"name": "1. Fregata Bałtyk",
 	"owner": "POL",
 	"type": "naval",
@@ -94,5 +106,17 @@
 	"owner": "POL",
 	"type": "naval",
 	"position": { "lat": 54.80, "lon": 17.50 }
+  },
+  {
+	"name": "3. Fregata Świnoujście",
+	"owner": "POL",
+	"type": "naval",
+	"position": { "lat": 53.95, "lon": 14.25 }
+  },
+  {
+	"name": "4. Korweta Kołobrzeg",
+	"owner": "POL",
+	"type": "naval",
+	"position": { "lat": 54.20, "lon": 15.55 }
   }
 ]

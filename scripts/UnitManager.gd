@@ -10,6 +10,7 @@ extends Node
 var active_entities: Array = []
 var nation_colors: Dictionary = {}
 var globe: Node = null
+var selected_entity: Node = null
 
 func initialize(globe_node: Node) -> void:
 	globe = globe_node
@@ -106,3 +107,77 @@ func _spawn_entity(entry: Dictionary) -> void:
 	entity.set_data(entry, color)
 
 	active_entities.append(entity)
+
+# ==================== SELECTION & INTERACTION ====================
+
+func select_entity(entity: Node) -> void:
+	if not is_instance_valid(entity):
+		return
+	if selected_entity and is_instance_valid(selected_entity) and selected_entity.has_method("set_selected"):
+		selected_entity.set_selected(false)
+	selected_entity = entity
+	if entity.has_method("set_selected"):
+		entity.set_selected(true)
+	print("[UnitManager] Selected: ", entity.name if entity.has("name") else entity)
+
+func deselect() -> void:
+	if selected_entity and is_instance_valid(selected_entity) and selected_entity.has_method("set_selected"):
+		selected_entity.set_selected(false)
+	selected_entity = null
+	print("[UnitManager] Deselected")
+
+func move_selected_to(world_pos: Vector3) -> void:
+	if selected_entity and is_instance_valid(selected_entity) and selected_entity.has_method("move_to"):
+		selected_entity.move_to(world_pos)
+		print("[UnitManager] Move requested for selected entity")
+
+# ==================== FADE / LOD ====================
+
+func update_fade_for_all(cam_distance: float) -> void:
+	var alpha := 1.0
+	# Fade entities when zoomed out (similar to states/cities)
+	if cam_distance > 1600:
+		alpha = 0.0
+	elif cam_distance > 1100:
+		alpha = clamp((1600.0 - cam_distance) / 500.0, 0.0, 1.0)
+	elif cam_distance < 600:
+		alpha = 1.0
+	for entity in active_entities:
+		if is_instance_valid(entity) and entity.has_method("update_fade"):
+			entity.update_fade(alpha)
+
+# ==================== MOUSE PICKING ====================
+
+func get_entity_at_mouse(mouse_pos: Vector2, cam: Camera3D) -> Node:
+	if not cam or active_entities.is_empty():
+		return null
+
+	# First try physics raycast (works for Ground + Naval which have CollisionArea)
+	var from := cam.project_ray_origin(mouse_pos)
+	var dir := cam.project_ray_normal(mouse_pos)
+	var space_state := cam.get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(from, from + dir * 20000.0)
+	query.collision_mask = 1  # CollisionArea layer
+	query.collide_with_areas = true
+	var result := space_state.intersect_ray(query)
+
+	if result and result.has("collider"):
+		var collider = result.collider
+		var parent := collider.get_parent() if collider else null
+		if parent and parent in active_entities:
+			return parent
+		# Sometimes collider is deeper
+		if parent and parent.get_parent() and parent.get_parent() in active_entities:
+			return parent.get_parent()
+
+	# Fallback for AirEntity (no CollisionArea) or missed hits: closest on screen
+	var closest: Node = null
+	var closest_dist := 999999.0
+	for e in active_entities:
+		if not is_instance_valid(e): continue
+		var screen_pos := cam.unproject_position(e.global_position)
+		var dist := screen_pos.distance_to(mouse_pos)
+		if dist < 50.0 and dist < closest_dist:  # ~50 pixel click radius
+			closest_dist = dist
+			closest = e
+	return closest
