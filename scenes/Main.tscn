@@ -38,3 +38,8 @@ mesh = SubResource("SphereMesh_0bj4a")
 
 [node name="Political" type="Node3D" parent="Mapmodes" unique_id=59502791]
 script = ExtResource("3_0bbpv")
+globe_path = null
+fill_radius_multiplier = null
+render_priority = null
+emission_energy = null
+base_subdivision = null
