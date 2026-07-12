@@ -23,9 +23,6 @@ func resolve_collisions(entities: Array) -> void:
 			var type_b := _get_entity_type(b)
 			if (type_a == "air" and type_b == "ground") or (type_a == "ground" and type_b == "air"):
 				continue
-			# Optionally skip air-naval and ground-naval too for domain separation, but keeping minimal change:
-			# if (type_a == "air" and type_b == "naval") or (type_a == "naval" and type_b == "air"): continue
-			# if (type_a == "ground" and type_b == "naval") or (type_a == "naval" and type_b == "ground"): continue
 
 			var diff: Vector3 = a.global_position - b.global_position
 			var dist: float = diff.length()
@@ -45,15 +42,20 @@ func resolve_collisions(entities: Array) -> void:
 			if b.has_method("_orient_to_surface"): b._orient_to_surface()
 
 func _get_entity_type(entity: Node) -> String:
-	if entity == null:
+	if not is_instance_valid(entity):
 		return "unknown"
-		if entity.has("data") and entity.data is Dictionary and entity.data.has("type"):
-			return str(entity.data["type"])
-		# Fallback by class name
-		if entity is AirEntity:
+	# Primary method: use the data dictionary set during spawning (most reliable)
+	if entity.has("data") and entity.data is Dictionary:
+		var t = entity.data.get("type", "")
+		if t != "":
+			return str(t)
+	# Fallbacks (only if data is missing)
+	if entity.has_method("get_class"):
+		var cls := entity.get_class()
+		if cls == "AirEntity":
 			return "air"
-		if entity is GroundEntity:
+		if cls == "GroundEntity":
 			return "ground"
-		if entity is NavalEntity:
+		if cls == "NavalEntity":
 			return "naval"
-		return "ground"  # default
+	return "ground"  # default
