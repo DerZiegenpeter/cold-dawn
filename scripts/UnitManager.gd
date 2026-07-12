@@ -49,7 +49,7 @@ func load_and_spawn_oob(oob_path: String = "res://data/oob.json") -> void:
 		push_warning("[UnitManager] oob.json nicht gefunden")
 		return
 
-	var file := FileAccess.open(path, FileAccess.READ)
+	var file := FileAccess.open(oob_path, FileAccess.READ)
 	var text := file.get_as_text()
 	file.close()
 
