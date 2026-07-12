@@ -44,10 +44,11 @@ func _create_visual() -> void:
 	# 8 corners of elongated box (long in Z)
 	vertices.push_back(Vector3(-w, -h, -l))
 	vertices.push_back(Vector3( w, -h, -l))
-	vertices.push_back(Vector3( w,  h, -l))
 	vertices.push_back(Vector3(-w,  h, -l))
 	vertices.push_back(Vector3(-w, -h,  l))
-	vertices.push_back(Vector3( w, -h,  l))
+	vertices.push_back(Vector3( w,  h,  l))
+	vertices.push_back(Vector3(-w,  h,  l))
+	vertices.push_back(Vector3(-w, -h,  l))
 	vertices.push_back(Vector3( w,  h,  l))
 	vertices.push_back(Vector3(-w,  h,  l))
 
@@ -94,12 +95,10 @@ func _setup_collision_from_scene_or_create() -> void:
 	add_child(collision_area)
 
 func _process(delta: float) -> void:
-	# Collision is now handled centrally in UnitManager._process() for performance
-	# if CollisionSystem:
-	# 	CollisionSystem.resolve_collisions(UnitManager.active_entities)
+	# IMPORTANT: Land checks are now only done while moving to avoid 78,000+ expensive _point_in_polygon calls
+	var is_moving := target_pos != Vector3.ZERO
 
-	# Naval: stay on water (not on land)
-	if LandSystem and LandSystem.is_position_on_land(global_position):
+	if is_moving and LandSystem and LandSystem.is_position_on_land(global_position):
 		global_position = last_valid_pos
 		target_pos = Vector3.ZERO
 		return
@@ -125,7 +124,7 @@ func _process(delta: float) -> void:
 	var new_dir := current_dir.slerp(target_dir, t)
 	global_position = new_dir * global_position.length()
 
-	if LandSystem and LandSystem.is_position_on_land(global_position):
+	if is_moving and LandSystem and LandSystem.is_position_on_land(global_position):
 		global_position = last_valid_pos
 		target_pos = Vector3.ZERO
 		return

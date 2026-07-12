@@ -84,11 +84,10 @@ func _setup_collision_from_scene_or_create() -> void:
 	add_child(collision_area)
 
 func _process(delta: float) -> void:
-	# Collision is now handled centrally in UnitManager._process() for performance
-	# if CollisionSystem:
-	# 	CollisionSystem.resolve_collisions(UnitManager.active_entities)
+	# IMPORTANT: Land checks are now only done while moving to avoid 78,000+ expensive _point_in_polygon calls per session
+	var is_moving := target_pos != Vector3.ZERO
 
-	if LandSystem and not LandSystem.is_position_on_land(global_position):
+	if is_moving and LandSystem and not LandSystem.is_position_on_land(global_position):
 		global_position = last_valid_pos
 		target_pos = Vector3.ZERO
 		return
@@ -114,7 +113,7 @@ func _process(delta: float) -> void:
 	var new_dir := current_dir.slerp(target_dir, t)
 	global_position = new_dir * global_position.length()
 
-	if LandSystem and not LandSystem.is_position_on_land(global_position):
+	if is_moving and LandSystem and not LandSystem.is_position_on_land(global_position):
 		global_position = last_valid_pos
 		target_pos = Vector3.ZERO
 		return
