@@ -128,10 +128,10 @@ func _create_country_mesh(rings: Array, color: Color, country_code: String) -> M
 					mesh_indices.append(vcount)
 					vcount += 1
 			else:
-			for v in tri_verts:
-				mesh_verts.append(v)
-				mesh_indices.append(vcount)
-				vcount += 1
+				for v in tri_verts:
+					mesh_verts.append(v)
+					mesh_indices.append(vcount)
+					vcount += 1
 
 	if mesh_verts.is_empty():
 		return null
@@ -234,5 +234,5 @@ func _extract_outer_rings(geom: Dictionary) -> Array[PackedVector2Array]:
 		"MultiPolygon":
 			for poly in geom.coordinates:
 				if poly.size() > 0:
-				rings.append(_coords_to_packed_vec2(geom.coordinates[0]))
+					rings.append(_coords_to_packed_vec2(geom.coordinates[0]))
 	return rings

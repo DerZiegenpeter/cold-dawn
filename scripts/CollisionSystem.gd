@@ -47,13 +47,16 @@ func resolve_collisions(entities: Array) -> void:
 func _get_entity_type(entity: Node) -> String:
 	if entity == null:
 		return "unknown"
-		if entity.has("data") and entity.data is Dictionary and entity.data.has("type"):
-			return str(entity.data["type"])
-		# Fallback by class name
-		if entity is AirEntity:
-			return "air"
-		if entity is GroundEntity:
-			return "ground"
-		if entity is NavalEntity:
-			return "naval"
-		return "ground"  # default
+	
+	# Use get("data") != null for safe property check (avoids nonexistent 'has' method)
+	if entity.get("data") != null and entity.data is Dictionary and entity.data.has("type"):
+		return str(entity.data["type"])
+	
+	# Fallback by class name
+	if entity is AirEntity:
+		return "air"
+	if entity is GroundEntity:
+		return "ground"
+	if entity is NavalEntity:
+		return "naval"
+	return "ground"  # default

@@ -8,7 +8,8 @@ func request_move(entity: Node, target_world_pos: Vector3) -> bool:
 		return false
 
 	var is_naval := false
-	if entity.has("data") and entity.data is Dictionary:
+	# Fixed: use get("data") != null instead of nonexistent .has("data")
+	if entity.get("data") != null and entity.data is Dictionary:
 		is_naval = entity.data.get("type", "") == "naval"
 
 	var globe := entity.get_parent() if entity.has_method("get_globe") else null
