@@ -44,18 +44,17 @@ func _create_visual() -> void:
 	# 8 corners of elongated box (long in Z)
 	vertices.push_back(Vector3(-w, -h, -l))
 	vertices.push_back(Vector3( w, -h, -l))
+	vertices.push_back(Vector3( w,  h, -l))
 	vertices.push_back(Vector3(-w,  h, -l))
 	vertices.push_back(Vector3(-w, -h,  l))
-	vertices.push_back(Vector3( w,  h,  l))
-	vertices.push_back(Vector3(-w,  h,  l))
-	vertices.push_back(Vector3(-w, -h,  l))
+	vertices.push_back(Vector3( w, -h,  l))
 	vertices.push_back(Vector3( w,  h,  l))
 	vertices.push_back(Vector3(-w,  h,  l))
 
 	# 12 edges (wireframe)
 	indices.append_array([0,1, 1,2, 2,3, 3,0])  # back face
 	indices.append_array([4,5, 5,6, 6,7, 7,4])  # front face
-	indices.append_array([0,4, 1,5, 2,6, 3,7])
+	indices.append_array([0,4, 1,5, 2,6, 3,7])  # connecting edges
 
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_INDEX] = indices
@@ -95,7 +94,7 @@ func _setup_collision_from_scene_or_create() -> void:
 	add_child(collision_area)
 
 func _process(delta: float) -> void:
-	# IMPORTANT: Land checks are now only done while moving to avoid 78,000+ expensive _point_in_polygon calls
+	# Land checks only while moving (big performance win)
 	var is_moving := target_pos != Vector3.ZERO
 
 	if is_moving and LandSystem and LandSystem.is_position_on_land(global_position):
@@ -138,9 +137,21 @@ func _orient_to_surface() -> void:
 	if not mesh_instance: return
 	var normal := global_position.normalized()
 	if normal.length_squared() < 0.0001: return
-	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
-	# Optional: lay the ship flat on surface - rotate so long axis (Z) is tangential
-	# For simplicity, current look_at makes one axis radial; user can enhance with movement direction later
+
+	# Proper flat orientation for ships:
+	# Y axis = radial (pointing outward from globe center)
+	# Z axis = tangential (long ship direction lies on the surface)
+	var y_axis := normal
+	
+	# Choose a stable tangential direction for the ship's length (Z)
+	var arbitrary := Vector3(0, 0, 1)
+	if abs(y_axis.dot(arbitrary)) > 0.99:
+		arbitrary = Vector3(1, 0, 0)
+	
+	var z_axis := arbitrary.cross(y_axis).normalized()
+	var x_axis := y_axis.cross(z_axis).normalized()
+	
+	mesh_instance.transform.basis = Basis(x_axis, y_axis, z_axis)
 
 func set_data(entry: Dictionary, color: Color) -> void:
 	data = entry
