@@ -14,11 +14,6 @@ var target_pos: Vector3 = Vector3.ZERO
 var last_valid_pos: Vector3 = Vector3.ZERO
 
 const ENTITY_SIZE := 2.2
-const MOVE_SPEED := 12.0
-
-const ACCELERATION := 18.0
-
-const FRICTION := 8.0
 
 func _ready() -> void:
 	_create_visual()
@@ -89,84 +84,74 @@ func _setup_collision_from_scene_or_create() -> void:
 	add_child(collision_area)
 
 func _process(delta: float) -> void:
-	var velocity: Vector3 = get_meta("velocity", Vector3.ZERO)
-
-	# Path following with velocity
 	if MovementSystem.has_active_path(self):
-		velocity = _update_velocity_toward_path(velocity, delta)
-	else:
-		velocity = _update_velocity_toward_target(velocity, delta)
-
-	# Apply velocity
-	global_position += velocity * delta
-
-	# Keep on sphere surface
-	global_position = global_position.normalized() * last_valid_pos.length()
-
-	# Collision resolution (gentle correction)
-	if CollisionSystem:
-		CollisionSystem.resolve_collisions(UnitManager.active_entities)
-
-	# Land check
-	if LandSystem and not LandSystem.is_position_on_land(global_position):
-		global_position = last_valid_pos
-		velocity = Vector3.ZERO
-		MovementSystem.clear_path(self)
-		set_meta("velocity", velocity)
+		_follow_path(delta)
 		return
 
-	last_valid_pos = global_position
-	set_meta("velocity", velocity)
+	if target_pos == Vector3.ZERO:
+		last_valid_pos = global_position
+		return
+
+	var current_dir := global_position.normalized()
+	var target_dir := target_pos.normalized()
+	var angle := current_dir.angle_to(target_dir)
+
+	var step := 22.0 * delta   # direct movement, frame-rate independent
+
+	if angle <= step:
+		global_position = target_pos
+		last_valid_pos = global_position
+		target_pos = Vector3.ZERO
+		MovementSystem.clear_path(self)
+		_orient_to_surface()
+		return
+
+	var t := step / angle
+	var new_dir := current_dir.slerp(target_dir, t)
+	global_position = new_dir * global_position.length()
+
+	if LandSystem and not LandSystem.is_position_on_land(global_position):
+		global_position = last_valid_pos
+		target_pos = Vector3.ZERO
+		MovementSystem.clear_path(self)
+		return
 
 	_orient_to_surface()
+	last_valid_pos = global_position
 
-func _update_velocity_toward_path(velocity: Vector3, delta: float) -> Vector3:
+func _follow_path(delta: float) -> void:
 	var path: Array = get_meta("current_path", [])
 	var index: int = get_meta("current_path_index", 0)
 
 	if path.size() == 0 or index >= path.size():
 		MovementSystem.clear_path(self)
-		return velocity * 0.8
+		return
 
 	var waypoint: Vector3 = path[index]
-	var to_waypoint := (waypoint - global_position).normalized()
 
-	# Accelerate toward waypoint
-	velocity += to_waypoint * ACCELERATION * delta
+	var current_dir := global_position.normalized()
+	var target_dir := waypoint.normalized()
+	var angle := current_dir.angle_to(target_dir)
 
-	# Apply friction
-	velocity = velocity.move_toward(Vector3.ZERO, FRICTION * delta)
+	var step := 22.0 * delta
 
-	# Limit speed
-	if velocity.length() > MOVE_SPEED:
-		velocity = velocity.normalized() * MOVE_SPEED
-
-	# Check if close to waypoint
-	if global_position.distance_to(waypoint) < 1.5:
+	if angle <= step:
+		global_position = waypoint
 		index += 1
 		set_meta("current_path_index", index)
 
 		if index >= path.size():
 			MovementSystem.clear_path(self)
+			_orient_to_surface()
+			last_valid_pos = global_position
+			return
+	else:
+		var t := step / angle
+		var new_dir := current_dir.slerp(target_dir, t)
+		global_position = new_dir * global_position.length()
 
-	return velocity
-
-func _update_velocity_toward_target(velocity: Vector3, delta: float) -> Vector3:
-	if target_pos == Vector3.ZERO:
-		return velocity * 0.8
-
-	var to_target := (target_pos - global_position).normalized()
-	velocity += to_target * ACCELERATION * delta
-	velocity = velocity.move_toward(Vector3.ZERO, FRICTION * delta)
-
-	if velocity.length() > MOVE_SPEED:
-		velocity = velocity.normalized() * MOVE_SPEED
-
-	if global_position.distance_to(target_pos) < 1.0:
-		target_pos = Vector3.ZERO
-		MovementSystem.clear_path(self)
-
-	return velocity
+	_orient_to_surface()
+	last_valid_pos = global_position
 
 func get_globe() -> Node:
 	return get_parent()
