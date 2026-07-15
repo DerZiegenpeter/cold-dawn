@@ -166,7 +166,15 @@ func _orient_to_surface() -> void:
 	if not mesh_instance: return
 	var normal := global_position.normalized()
 	if normal.length_squared() < 0.0001: return
-	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
+
+	# Proper flat ship orientation (long axis tangential)
+	var y_axis := normal
+	var arbitrary := Vector3(0, 0, 1)
+	if abs(y_axis.dot(arbitrary)) > 0.99:
+		arbitrary = Vector3(1, 0, 0)
+	var z_axis := arbitrary.cross(y_axis).normalized()
+	var x_axis := y_axis.cross(z_axis).normalized()
+	mesh_instance.transform.basis = Basis(x_axis, y_axis, z_axis)
 
 func set_data(entry: Dictionary, color: Color) -> void:
 	data = entry
