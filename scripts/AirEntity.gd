@@ -10,16 +10,13 @@ var is_selected: bool = false
 var mesh_instance: MeshInstance3D = null
 var target_pos: Vector3 = Vector3.ZERO
 
+var last_valid_pos: Vector3 = Vector3.ZERO
+
 const ENTITY_SIZE := 2.2
-
-const MOVE_SPEED := 18.0
-
-const ACCELERATION := 22.0
-
-const FRICTION := 5.0
 
 func _ready() -> void:
 	_create_visual()
+	last_valid_pos = global_position
 
 func _create_visual() -> void:
 	if mesh_instance != null: return
@@ -49,66 +46,68 @@ func _create_visual() -> void:
 	add_child(mesh_instance)
 
 func _process(delta: float) -> void:
-	var velocity: Vector3 = get_meta("velocity", Vector3.ZERO)
-
 	if MovementSystem.has_active_path(self):
-		velocity = _update_velocity_toward_path(velocity, delta)
-	else:
-		velocity = _update_velocity_toward_target(velocity, delta)
+		_follow_path(delta)
+		return
 
-	global_position += velocity * delta
-	global_position = global_position.normalized() * last_valid_pos.length()
+	if target_pos == Vector3.ZERO:
+		last_valid_pos = global_position
+		return
 
-	if CollisionSystem:
-		CollisionSystem.resolve_collisions(UnitManager.active_entities)
+	var current_dir := global_position.normalized()
+	var target_dir := target_pos.normalized()
+	var angle := current_dir.angle_to(target_dir)
 
-	last_valid_pos = global_position
-	set_meta("velocity", velocity)
+	var step := 18.0 * delta   # direct, frame-rate independent speed
+
+	if angle <= step:
+		global_position = target_pos
+		target_pos = Vector3.ZERO
+		MovementSystem.clear_path(self)
+		_orient_to_surface()
+		last_valid_pos = global_position
+		return
+
+	var t := step / angle
+	var new_dir := current_dir.slerp(target_dir, t)
+	global_position = new_dir * global_position.length()
 
 	_orient_to_surface()
+	last_valid_pos = global_position
 
-func _update_velocity_toward_path(velocity: Vector3, delta: float) -> Vector3:
+func _follow_path(delta: float) -> void:
 	var path: Array = get_meta("current_path", [])
 	var index: int = get_meta("current_path_index", 0)
 
 	if path.size() == 0 or index >= path.size():
 		MovementSystem.clear_path(self)
-		return velocity * 0.8
+		return
 
 	var waypoint: Vector3 = path[index]
-	var to_waypoint := (waypoint - global_position).normalized()
 
-	velocity += to_waypoint * ACCELERATION * delta
-	velocity = velocity.move_toward(Vector3.ZERO, FRICTION * delta)
+	var current_dir := global_position.normalized()
+	var target_dir := waypoint.normalized()
+	var angle := current_dir.angle_to(target_dir)
 
-	if velocity.length() > MOVE_SPEED:
-		velocity = velocity.normalized() * MOVE_SPEED
+	var step := 18.0 * delta
 
-	if global_position.distance_to(waypoint) < 2.5:
+	if angle <= step:
+		global_position = waypoint
 		index += 1
 		set_meta("current_path_index", index)
 
 		if index >= path.size():
 			MovementSystem.clear_path(self)
+			_orient_to_surface()
+			last_valid_pos = global_position
+			return
+	else:
+		var t := step / angle
+		var new_dir := current_dir.slerp(target_dir, t)
+		global_position = new_dir * global_position.length()
 
-	return velocity
-
-func _update_velocity_toward_target(velocity: Vector3, delta: float) -> Vector3:
-	if target_pos == Vector3.ZERO:
-		return velocity * 0.8
-
-	var to_target := (target_pos - global_position).normalized()
-	velocity += to_target * ACCELERATION * delta
-	velocity = velocity.move_toward(Vector3.ZERO, FRICTION * delta)
-
-	if velocity.length() > MOVE_SPEED:
-		velocity = velocity.normalized() * MOVE_SPEED
-
-	if global_position.distance_to(target_pos) < 2.0:
-		target_pos = Vector3.ZERO
-		MovementSystem.clear_path(self)
-
-	return velocity
+	_orient_to_surface()
+	last_valid_pos = global_position
 
 func _orient_to_surface() -> void:
 	if not mesh_instance: return
@@ -122,6 +121,7 @@ func set_data(entry: Dictionary, color: Color) -> void:
 	if not mesh_instance: _create_visual()
 	_update_visual()
 	_orient_to_surface()
+	last_valid_pos = global_position
 
 func set_selected(selected: bool) -> void:
 	is_selected = selected
