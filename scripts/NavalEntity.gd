@@ -90,10 +90,11 @@ func _setup_collision_from_scene_or_create() -> void:
 	add_child(collision_area)
 
 func _process(delta: float) -> void:
-	if MovementSystem.has_active_path(self):
-		_follow_path(delta)
+	if MovementSystem and MovementSystem.has_active_path(self):
+		MovementSystem.update_movement(self, delta)
 		return
 
+	# Legacy direct movement
 	if target_pos == Vector3.ZERO:
 		last_valid_pos = global_position
 		return
@@ -102,7 +103,7 @@ func _process(delta: float) -> void:
 	var target_dir := target_pos.normalized()
 	var angle := current_dir.angle_to(target_dir)
 
-	var step := 18.0 * delta
+	var step := 0.5 * delta
 
 	if angle <= step:
 		global_position = target_pos
@@ -121,40 +122,6 @@ func _process(delta: float) -> void:
 		target_pos = Vector3.ZERO
 		MovementSystem.clear_path(self)
 		return
-
-	_orient_to_surface()
-	last_valid_pos = global_position
-
-func _follow_path(delta: float) -> void:
-	var path: Array = get_meta("current_path", [])
-	var index: int = get_meta("current_path_index", 0)
-
-	if path.size() == 0 or index >= path.size():
-		MovementSystem.clear_path(self)
-		return
-
-	var waypoint: Vector3 = path[index]
-
-	var current_dir := global_position.normalized()
-	var target_dir := waypoint.normalized()
-	var angle := current_dir.angle_to(target_dir)
-
-	var step := 18.0 * delta
-
-	if angle <= step:
-		global_position = waypoint
-		index += 1
-		set_meta("current_path_index", index)
-
-		if index >= path.size():
-			MovementSystem.clear_path(self)
-			_orient_to_surface()
-			last_valid_pos = global_position
-			return
-	else:
-		var t := step / angle
-		var new_dir := current_dir.slerp(target_dir, t)
-		global_position = new_dir * global_position.length()
 
 	_orient_to_surface()
 	last_valid_pos = global_position

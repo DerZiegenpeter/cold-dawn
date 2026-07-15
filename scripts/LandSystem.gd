@@ -29,28 +29,18 @@ func is_position_on_land(world_pos: Vector3) -> bool:
 	if not _initialized or world_pos.length() < 1.0:
 		return false
 
-	# Broad Phase
-	var min_dist: float = 999999.0
-	var closest_id: int = -1
+	var n := world_pos.normalized()
+	var lat := rad_to_deg(asin(n.y))
+	var lon := rad_to_deg(atan2(n.x, n.z))
 
+	# Improved broadphase: check states whose centers are within safe radius (covers large countries like Russia/US)
+	# Brute-force nearby polygons for correctness. Perf fine for game use.
 	for id in _state_ids:
-		var dist: float = state_centers[id].distance_to(world_pos)
-		if dist < min_dist:
-			min_dist = dist
-			closest_id = id
-
-	if min_dist > 120.0:
-		return false
-
-	# Narrow Phase
-	if closest_id != -1 and state_polygons.has(closest_id):
-		if _point_in_polygon_world(world_pos, state_polygons[closest_id]):
+		if not state_centers.has(id): continue
+		var cdist := state_centers[id].distance_to(world_pos)
+		if cdist > 650.0: continue
+		if state_polygons.has(id) and _point_in_polygon(lon, lat, state_polygons[id]):
 			return true
-
-	for id in _state_ids:
-		if state_centers[id].distance_to(world_pos) < 80.0:
-			if state_polygons.has(id) and _point_in_polygon_world(world_pos, state_polygons[id]):
-				return true
 
 	return false
 
