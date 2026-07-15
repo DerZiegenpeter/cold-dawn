@@ -51,8 +51,6 @@ func _input(event: InputEvent) -> void:
 			if distance < 800:
 				zoom_factor = lerp(1.007, 1.04, clamp((distance - 505) / 295.0, 0.0, 1.0))
 			target_distance = min(max_distance, target_distance * zoom_factor)
-		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			pass
 	elif event is InputEventMouseMotion and is_dragging:
 		var delta: Vector2 = event.position - last_mouse_pos
 		var current_sens: float = sensitivity * clampf(distance / 1100.0, 0.25, 1.0)
@@ -152,32 +150,38 @@ func _handle_right_click() -> void:
 	if not UnitManager.selected_entity: return
 
 	var mouse_pos := get_viewport().get_mouse_position()
-	var from := project_ray_origin(mouse_pos)
-	var dir := project_ray_normal(mouse_pos)
 
-	# Check if we right-clicked on/near another unit (for manual Battle)
-	var target_entity = UnitManager.get_entity_at_mouse(mouse_pos, self)
+	# Check for enemy unit under cursor for manual Battle (more precise now)
+	var target_entity = UnitManager.get_entity_at_mouse(mouse_pos, self, 20.0)  # strict 20px
 	if target_entity and target_entity != UnitManager.selected_entity:
 		if CollisionSystem and CollisionSystem._are_enemies(UnitManager.selected_entity, target_entity):
-			# Manual Battle start with brighter marker
 			if CollisionSystem.has_method("start_battle"):
 				CollisionSystem.start_battle(UnitManager.selected_entity, target_entity)
-			return
+			return  # Started Battle, do not move
 
-	# Normal move to position on globe
+	# Normal movement to globe position
+	var from := project_ray_origin(mouse_pos)
+	var dir := project_ray_normal(mouse_pos)
 	var hit_pos := _raycast_to_globe_sphere(from, dir)
+
 	if hit_pos != Vector3.ZERO:
 		var selected = UnitManager.selected_entity
 		var allow_move := true
 
+		# Type-specific validation
 		if selected is GroundEntity:
 			if not (LandSystem and LandSystem.is_position_on_land(hit_pos)):
 				allow_move = false
+				print("[Movement] Nur auf Land/States erlaubt!")
+		elif selected is NavalEntity:
+			if LandSystem and LandSystem.is_position_on_land(hit_pos):
+				allow_move = false
+				print("[Movement] Naval kann nicht auf Land!")
 
 		if allow_move:
 			UnitManager.move_selected_to(hit_pos)
 		else:
-			print("[Movement] Nur auf Land/States erlaubt!")
+			print("[Movement] Bewegung blockiert!")
 
 func _did_hit_anything(mouse_pos: Vector2) -> bool:
 	var entity = UnitManager.get_entity_at_mouse(mouse_pos, self)
