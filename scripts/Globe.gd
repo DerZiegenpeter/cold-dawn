@@ -34,6 +34,52 @@ func get_state_polygons() -> Dictionary:
 func get_state_centers() -> Dictionary:
 	return state_centers
 
+func show_click_ring(world_pos: Vector3) -> void:
+	var ring := MeshInstance3D.new()
+	ring.name = "ClickRing"
+
+	var immediate_mesh := ImmediateMesh.new()
+	var material := StandardMaterial3D.new()
+
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.emission_enabled = true
+	material.emission = Color(0.4, 0.7, 1.0)
+	material.emission_energy_multiplier = 4.0
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = Color(0.6, 0.85, 1.0, 0.85)
+	material.render_priority = 50
+
+	var normal := world_pos.normalized()
+	var radius := 12.0
+	var segments := 64
+	var lift := 3.5
+
+	# Create two perpendicular vectors in the tangent plane
+	var arbitrary := Vector3(0, 1, 0)
+	if abs(normal.dot(arbitrary)) > 0.99:
+		arbitrary = Vector3(1, 0, 0)
+	var tangent1 := normal.cross(arbitrary).normalized()
+	var tangent2 := normal.cross(tangent1).normalized()
+
+	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, material)
+	for i in range(segments + 1):
+		var angle := float(i) / segments * TAU
+		var offset := tangent1 * cos(angle) * radius + tangent2 * sin(angle) * radius
+		var pos := (normal * (world_pos.length() + lift)) + offset
+		immediate_mesh.surface_add_vertex(pos)
+	immediate_mesh.surface_end()
+
+	ring.mesh = immediate_mesh
+	add_child(ring)
+
+	# Animate grow + fade (high quality feel)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(ring, "scale", Vector3(2.5, 2.5, 2.5), 0.9).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(material, "albedo_color:a", 0.0, 0.85).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_property(material, "emission_energy_multiplier", 0.5, 0.85)
+	tween.tween_callback(ring.queue_free).set_delay(1.0)
+
 func load_state_data() -> void:
 	var path := "res://data/states.json"
 	if not FileAccess.file_exists(path): return
