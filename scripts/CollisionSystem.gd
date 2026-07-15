@@ -6,14 +6,12 @@ extends Node
 ##     Land  <-> Land
 ##     Naval <-> Naval
 ##     Air   <-> Air
-## - All cross-domain = NO collision (Air flies over, Naval ignores Land, etc.)
-##
-## Combat: Hostile units create red marker + stick when close
+## - All cross-domain = NO collision
 
 @export var separation_radius := 4.5
-@export var separation_force := 1.8          # softer push to reduce jitter
+@export var separation_force := 1.8
 @export var combat_radius := 3.0
-@export var combat_push_multiplier := 0.08   # very sticky during combat
+@export var combat_push_multiplier := 0.08
 
 var _combat_markers: Dictionary = {}
 
@@ -32,30 +30,25 @@ func resolve_collisions(entities: Array) -> void:
 			var type_a := _get_entity_type(a)
 			var type_b := _get_entity_type(b)
 
-			# === STRICT COLLISION RULES ===
 			if type_a != type_b:
-				continue   # Only same type collides (Land-Land, Naval-Naval, Air-Air)
+				continue
 
 			var diff: Vector3 = a.global_position - b.global_position
 			var dist: float = diff.length()
 			if dist < 0.05: continue
 
 			var push_multiplier := 1.0
-			var is_combat := false
 
-			# Combat check (hostile units)
 			if _are_enemies(a, b) and dist < combat_radius:
-				is_combat = true
 				push_multiplier = combat_push_multiplier
-				_ensure_combat_marker(a, b, (a.global_position + b.global_position) * 0.5)
+				_ensure_combat_marker(a, b, (a.global_position + b.global_position) * 0.5, false)  # skirmish = normal glow
 
 			if dist > separation_radius: continue
 
-			# Softer, more stable separation to prevent jitter/hooking
 			var push: Vector3 = diff.normalized() * ((separation_radius - dist) * separation_force * push_multiplier)
 
 			var na: Vector3 = a.global_position.normalized()
-			var ta: Vector3 = (push - push.dot(na) * na) * 0.5   # softer tangential push
+			var ta: Vector3 = (push - push.dot(na) * na) * 0.5
 			a.global_position += ta
 
 			var nb: Vector3 = b.global_position.normalized()
@@ -65,7 +58,7 @@ func resolve_collisions(entities: Array) -> void:
 			if a.has_method("_orient_to_surface"): a._orient_to_surface()
 			if b.has_method("_orient_to_surface"): b._orient_to_surface()
 
-func _ensure_combat_marker(a: Node, b: Node, contact_pos: Vector3) -> void:
+func _ensure_combat_marker(a: Node, b: Node, contact_pos: Vector3, is_battle: bool = false) -> void:
 	var key := _get_combat_key(a, b)
 	if _combat_markers.has(key): return
 
@@ -73,7 +66,7 @@ func _ensure_combat_marker(a: Node, b: Node, contact_pos: Vector3) -> void:
 	marker.name = "CombatMarker"
 
 	var sphere := SphereMesh.new()
-	sphere.radius = 0.7          # smaller red dot
+	sphere.radius = 0.7
 	sphere.height = 1.4
 	marker.mesh = sphere
 
@@ -81,7 +74,7 @@ func _ensure_combat_marker(a: Node, b: Node, contact_pos: Vector3) -> void:
 	mat.albedo_color = Color(1, 0.15, 0.15)
 	mat.emission_enabled = true
 	mat.emission = Color(1, 0.3, 0.3)
-	mat.emission_energy_multiplier = 3.0
+	mat.emission_energy_multiplier = 4.5 if is_battle else 2.8   # brighter for Battle
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.albedo_color.a = 0.9
 	marker.material_override = mat
@@ -94,6 +87,19 @@ func _ensure_combat_marker(a: Node, b: Node, contact_pos: Vector3) -> void:
 		add_child(marker)
 
 	_combat_markers[key] = marker
+
+func start_battle(attacker: Node, target: Node) -> void:
+	if not is_instance_valid(attacker) or not is_instance_valid(target): return
+	if not _are_enemies(attacker, target): return
+
+	# Force them close and create bright Battle marker
+	var mid_pos = (attacker.global_position + target.global_position) * 0.5
+	_ensure_combat_marker(attacker, target, mid_pos, true)  # is_battle = true → brighter glow
+
+	# Slightly push them together so they engage
+	var dir = (target.global_position - attacker.global_position).normalized()
+	attacker.global_position += dir * 1.5
+	target.global_position -= dir * 1.5
 
 func end_combat(a: Node, b: Node) -> void:
 	var key := _get_combat_key(a, b)
