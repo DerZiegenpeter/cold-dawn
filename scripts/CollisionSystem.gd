@@ -1,20 +1,20 @@
 extends Node
 
 ## CollisionSystem
-## Rules:
-## - Land vs Land: collision
-## - Naval vs Naval: collision
-## - Air vs (Air, Land, Naval): collision
-## - Everything else (Land-Naval, etc.): no collision
+## Final Rules:
+## - ONLY same domain collides:
+##     Land  <-> Land
+##     Naval <-> Naval
+##     Air   <-> Air
+## - All cross-domain = NO collision (Air flies over, Naval ignores Land, etc.)
 ##
-## Combat: Hostile units that get close stick + get red marker
+## Combat: Hostile units create red marker + stick when close
 
-@export var separation_radius := 3.8
-@export var separation_force := 2.8
-@export var combat_radius := 2.5
-@export var combat_push_multiplier := 0.15   # they stick together
+@export var separation_radius := 4.5
+@export var separation_force := 1.8          # softer push to reduce jitter
+@export var combat_radius := 3.0
+@export var combat_push_multiplier := 0.08   # very sticky during combat
 
-# Track active combat markers (contact_pos -> red sphere)
 var _combat_markers: Dictionary = {}
 
 func resolve_collisions(entities: Array) -> void:
@@ -32,42 +32,34 @@ func resolve_collisions(entities: Array) -> void:
 			var type_a := _get_entity_type(a)
 			var type_b := _get_entity_type(b)
 
-			# === COLLISION RULES ===
-			var should_collide := false
-
-			if type_a == "land" and type_b == "land":
-				should_collide = true
-			elif type_a == "naval" and type_b == "naval":
-				should_collide = true
-			elif type_a == "air" or type_b == "air":
-				should_collide = true
-
-			if not should_collide:
-				continue
+			# === STRICT COLLISION RULES ===
+			if type_a != type_b:
+				continue   # Only same type collides (Land-Land, Naval-Naval, Air-Air)
 
 			var diff: Vector3 = a.global_position - b.global_position
 			var dist: float = diff.length()
 			if dist < 0.05: continue
 
-			var is_combat := false
 			var push_multiplier := 1.0
+			var is_combat := false
 
-			# === COMBAT LOGIC ===
+			# Combat check (hostile units)
 			if _are_enemies(a, b) and dist < combat_radius:
 				is_combat = true
-				push_multiplier = combat_push_multiplier   # they stick
+				push_multiplier = combat_push_multiplier
 				_ensure_combat_marker(a, b, (a.global_position + b.global_position) * 0.5)
 
 			if dist > separation_radius: continue
 
+			# Softer, more stable separation to prevent jitter/hooking
 			var push: Vector3 = diff.normalized() * ((separation_radius - dist) * separation_force * push_multiplier)
 
 			var na: Vector3 = a.global_position.normalized()
-			var ta: Vector3 = (push - push.dot(na) * na) * 0.6
+			var ta: Vector3 = (push - push.dot(na) * na) * 0.5   # softer tangential push
 			a.global_position += ta
 
 			var nb: Vector3 = b.global_position.normalized()
-			var tb: Vector3 = (-push - (-push).dot(nb) * nb) * 0.3
+			var tb: Vector3 = (-push - (-push).dot(nb) * nb) * 0.25
 			b.global_position += tb
 
 			if a.has_method("_orient_to_surface"): a._orient_to_surface()
@@ -75,30 +67,27 @@ func resolve_collisions(entities: Array) -> void:
 
 func _ensure_combat_marker(a: Node, b: Node, contact_pos: Vector3) -> void:
 	var key := _get_combat_key(a, b)
-	if _combat_markers.has(key):
-		return
+	if _combat_markers.has(key): return
 
 	var marker := MeshInstance3D.new()
 	marker.name = "CombatMarker"
 
 	var sphere := SphereMesh.new()
-	sphere.radius = 1.2
-	sphere.height = 2.4
+	sphere.radius = 0.7          # smaller red dot
+	sphere.height = 1.4
 	marker.mesh = sphere
 
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(1, 0.1, 0.1)
+	mat.albedo_color = Color(1, 0.15, 0.15)
 	mat.emission_enabled = true
-	mat.emission = Color(1, 0.2, 0.2)
-	mat.emission_energy_multiplier = 2.5
+	mat.emission = Color(1, 0.3, 0.3)
+	mat.emission_energy_multiplier = 3.0
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color.a = 0.85
+	mat.albedo_color.a = 0.9
 	marker.material_override = mat
 
-	# Place marker slightly above surface
-	marker.global_position = contact_pos.normalized() * (contact_pos.length() + 2.0)
+	marker.global_position = contact_pos.normalized() * (contact_pos.length() + 1.8)
 
-	# Attach to globe or one of the units
 	if a.get_parent():
 		a.get_parent().add_child(marker)
 	else:
@@ -120,26 +109,19 @@ func _get_combat_key(a: Node, b: Node) -> String:
 	return str(min(id_a, id_b)) + "_" + str(max(id_a, id_b))
 
 func _get_entity_type(entity: Node) -> String:
-	if entity == null:
-		return "unknown"
-
+	if entity == null: return "unknown"
 	if entity.get("data") != null and entity.data is Dictionary and entity.data.has("type"):
 		return str(entity.data["type"])
-
-	if entity is AirEntity:
-		return "air"
-	if entity is GroundEntity:
-		return "ground"
-	if entity is NavalEntity:
-		return "naval"
+	if entity is AirEntity: return "air"
+	if entity is GroundEntity: return "ground"
+	if entity is NavalEntity: return "naval"
 	return "ground"
 
 func _are_enemies(a: Node, b: Node) -> bool:
 	if not a.get("data") or not b.get("data"): return false
 	var owner_a := str(a.data.get("owner", ""))
 	var owner_b := str(b.data.get("owner", ""))
-	if owner_a == "" or owner_b == "": return false
-	return owner_a != owner_b
+	return owner_a != "" and owner_b != "" and owner_a != owner_b
 
 func clear_all_combat_markers() -> void:
 	for marker in _combat_markers.values():
