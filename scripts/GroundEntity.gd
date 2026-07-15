@@ -84,12 +84,17 @@ func _setup_collision_from_scene_or_create() -> void:
 	add_child(collision_area)
 
 func _process(delta: float) -> void:
-	# IMPORTANT: Land checks are now only done while moving to avoid 78,000+ expensive _point_in_polygon calls per session
 	var is_moving := target_pos != Vector3.ZERO
 
 	if is_moving and LandSystem and not LandSystem.is_position_on_land(global_position):
 		global_position = last_valid_pos
 		target_pos = Vector3.ZERO
+		MovementSystem.clear_path(self)
+		return
+
+	# Path following
+	if MovementSystem.has_active_path(self):
+		_follow_path(delta)
 		return
 
 	if target_pos == Vector3.ZERO:
@@ -106,6 +111,7 @@ func _process(delta: float) -> void:
 		global_position = target_pos
 		last_valid_pos = global_position
 		target_pos = Vector3.ZERO
+		MovementSystem.clear_path(self)
 		_orient_to_surface()
 		return
 
@@ -113,10 +119,43 @@ func _process(delta: float) -> void:
 	var new_dir := current_dir.slerp(target_dir, t)
 	global_position = new_dir * global_position.length()
 
-	if is_moving and LandSystem and not LandSystem.is_position_on_land(global_position):
+	if LandSystem and not LandSystem.is_position_on_land(global_position):
 		global_position = last_valid_pos
 		target_pos = Vector3.ZERO
+		MovementSystem.clear_path(self)
 		return
+
+	_orient_to_surface()
+
+func _follow_path(delta: float) -> void:
+	var path: Array = get_meta("current_path", [])
+	var index: int = get_meta("current_path_index", 0)
+
+	if path.size() == 0 or index >= path.size():
+		MovementSystem.clear_path(self)
+		return
+
+	var waypoint := path[index]
+
+	var current_dir := global_position.normalized()
+	var target_dir := waypoint.normalized()
+	var angle := current_dir.angle_to(target_dir)
+
+	var step := 0.05 * delta
+
+	if angle <= step:
+		global_position = waypoint
+		index += 1
+		set_meta("current_path_index", index)
+
+		if index >= path.size():
+			MovementSystem.clear_path(self)
+			_orient_to_surface()
+			return
+	else:
+		var t := step / angle
+		var new_dir := current_dir.slerp(target_dir, t)
+		global_position = new_dir * global_position.length()
 
 	_orient_to_surface()
 

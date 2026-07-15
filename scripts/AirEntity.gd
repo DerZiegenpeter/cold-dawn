@@ -21,7 +21,6 @@ func _create_visual() -> void:
 	mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = "Visual"
 
-	# Changed from wireframe cube to sphere for air entities
 	var sphere := SphereMesh.new()
 	sphere.radius = ENTITY_SIZE * 0.65
 	sphere.height = ENTITY_SIZE * 1.3
@@ -44,6 +43,10 @@ func _create_visual() -> void:
 	add_child(mesh_instance)
 
 func _process(delta: float) -> void:
+	if MovementSystem.has_active_path(self):
+		_follow_path(delta)
+		return
+
 	if target_pos == Vector3.ZERO:
 		return
 
@@ -56,6 +59,7 @@ func _process(delta: float) -> void:
 	if angle <= step:
 		global_position = target_pos
 		target_pos = Vector3.ZERO
+		MovementSystem.clear_path(self)
 		_orient_to_surface()
 		return
 
@@ -64,12 +68,42 @@ func _process(delta: float) -> void:
 	global_position = new_dir * global_position.length()
 	_orient_to_surface()
 
+func _follow_path(delta: float) -> void:
+	var path: Array = get_meta("current_path", [])
+	var index: int = get_meta("current_path_index", 0)
+
+	if path.size() == 0 or index >= path.size():
+		MovementSystem.clear_path(self)
+		return
+
+	var waypoint := path[index]
+
+	var current_dir := global_position.normalized()
+	var target_dir := waypoint.normalized()
+	var angle := current_dir.angle_to(target_dir)
+
+	var step := 0.05 * delta
+
+	if angle <= step:
+		global_position = waypoint
+		index += 1
+		set_meta("current_path_index", index)
+
+		if index >= path.size():
+			MovementSystem.clear_path(self)
+			_orient_to_surface()
+			return
+	else:
+		var t := step / angle
+		var new_dir := current_dir.slerp(target_dir, t)
+		global_position = new_dir * global_position.length()
+
+	_orient_to_surface()
+
 func _orient_to_surface() -> void:
 	if not mesh_instance: return
-	# For sphere, simple outward orientation (no need for complex rotation like cube)
 	var normal := global_position.normalized()
 	if normal.length_squared() < 0.0001: return
-	# Sphere is symmetric, but we can still align if future needs (e.g. selection marker)
 	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
 
 func set_data(entry: Dictionary, color: Color) -> void:
@@ -84,9 +118,8 @@ func set_selected(selected: bool) -> void:
 	_update_visual()
 
 func move_to(world_pos: Vector3) -> void:
-	# Air Entities dürfen über Wasser fliegen -> kein Land-Check
-	var s := ENTITY_SIZE
-	target_pos = world_pos.normalized() * (world_pos.length() + s * 1.8)
+	if MovementSystem:
+		MovementSystem.request_move(self, world_pos)
 
 func update_fade(alpha: float) -> void:
 	if not mesh_instance: return

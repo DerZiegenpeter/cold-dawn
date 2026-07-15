@@ -29,7 +29,6 @@ func _create_visual() -> void:
 	mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = "Visual"
 
-	# Thin long cube (ship-like) wireframe using lines - elongated along local Z axis
 	var mesh := ArrayMesh.new()
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
@@ -37,11 +36,10 @@ func _create_visual() -> void:
 	var vertices := PackedVector3Array()
 	var indices := PackedInt32Array()
 
-	var l := NAVAL_LENGTH / 2.0   # half length (long axis, will be tangential after orient)
+	var l := NAVAL_LENGTH / 2.0
 	var w := NAVAL_WIDTH / 2.0
 	var h := NAVAL_HEIGHT / 2.0
 
-	# 8 corners of elongated box (long in Z)
 	vertices.push_back(Vector3(-w, -h, -l))
 	vertices.push_back(Vector3( w, -h, -l))
 	vertices.push_back(Vector3( w,  h, -l))
@@ -51,10 +49,9 @@ func _create_visual() -> void:
 	vertices.push_back(Vector3( w,  h,  l))
 	vertices.push_back(Vector3(-w,  h,  l))
 
-	# 12 edges (wireframe)
-	indices.append_array([0,1, 1,2, 2,3, 3,0])  # back face
-	indices.append_array([4,5, 5,6, 6,7, 7,4])  # front face
-	indices.append_array([0,4, 1,5, 2,6, 3,7])  # connecting edges
+	indices.append_array([0,1, 1,2, 2,3, 3,0])
+	indices.append_array([4,5, 5,6, 6,7, 7,4])
+	indices.append_array([0,4, 1,5, 2,6, 3,7])
 
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_INDEX] = indices
@@ -87,19 +84,22 @@ func _setup_collision_from_scene_or_create() -> void:
 
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	# Elongated collision box matching visual (long in Z)
 	box.size = Vector3(NAVAL_WIDTH, NAVAL_HEIGHT, NAVAL_LENGTH)
 	shape.shape = box
 	collision_area.add_child(shape)
 	add_child(collision_area)
 
 func _process(delta: float) -> void:
-	# Land checks only while moving (big performance win)
 	var is_moving := target_pos != Vector3.ZERO
 
 	if is_moving and LandSystem and LandSystem.is_position_on_land(global_position):
 		global_position = last_valid_pos
 		target_pos = Vector3.ZERO
+		MovementSystem.clear_path(self)
+		return
+
+	if MovementSystem.has_active_path(self):
+		_follow_path(delta)
 		return
 
 	if target_pos == Vector3.ZERO:
@@ -116,6 +116,7 @@ func _process(delta: float) -> void:
 		global_position = target_pos
 		last_valid_pos = global_position
 		target_pos = Vector3.ZERO
+		MovementSystem.clear_path(self)
 		_orient_to_surface()
 		return
 
@@ -123,10 +124,43 @@ func _process(delta: float) -> void:
 	var new_dir := current_dir.slerp(target_dir, t)
 	global_position = new_dir * global_position.length()
 
-	if is_moving and LandSystem and LandSystem.is_position_on_land(global_position):
+	if LandSystem and LandSystem.is_position_on_land(global_position):
 		global_position = last_valid_pos
 		target_pos = Vector3.ZERO
+		MovementSystem.clear_path(self)
 		return
+
+	_orient_to_surface()
+
+func _follow_path(delta: float) -> void:
+	var path: Array = get_meta("current_path", [])
+	var index: int = get_meta("current_path_index", 0)
+
+	if path.size() == 0 or index >= path.size():
+		MovementSystem.clear_path(self)
+		return
+
+	var waypoint := path[index]
+
+	var current_dir := global_position.normalized()
+	var target_dir := waypoint.normalized()
+	var angle := current_dir.angle_to(target_dir)
+
+	var step := 0.05 * delta
+
+	if angle <= step:
+		global_position = waypoint
+		index += 1
+		set_meta("current_path_index", index)
+
+		if index >= path.size():
+			MovementSystem.clear_path(self)
+			_orient_to_surface()
+			return
+	else:
+		var t := step / angle
+		var new_dir := current_dir.slerp(target_dir, t)
+		global_position = new_dir * global_position.length()
 
 	_orient_to_surface()
 
@@ -137,21 +171,7 @@ func _orient_to_surface() -> void:
 	if not mesh_instance: return
 	var normal := global_position.normalized()
 	if normal.length_squared() < 0.0001: return
-
-	# Proper flat orientation for ships:
-	# Y axis = radial (pointing outward from globe center)
-	# Z axis = tangential (long ship direction lies on the surface)
-	var y_axis := normal
-	
-	# Choose a stable tangential direction for the ship's length (Z)
-	var arbitrary := Vector3(0, 0, 1)
-	if abs(y_axis.dot(arbitrary)) > 0.99:
-		arbitrary = Vector3(1, 0, 0)
-	
-	var z_axis := arbitrary.cross(y_axis).normalized()
-	var x_axis := y_axis.cross(z_axis).normalized()
-	
-	mesh_instance.transform.basis = Basis(x_axis, y_axis, z_axis)
+	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
 
 func set_data(entry: Dictionary, color: Color) -> void:
 	data = entry
@@ -167,7 +187,6 @@ func set_selected(selected: bool) -> void:
 
 func _set_target_position(world_pos: Vector3) -> void:
 	var s := ENTITY_SIZE
-	# Slight lift above surface for ships
 	target_pos = world_pos.normalized() * (world_pos.length() + s * 0.4)
 
 func move_to(world_pos: Vector3) -> void:
