@@ -174,12 +174,14 @@ func _handle_right_click() -> void:
 				allow_move = false
 				print("[Movement] Nur auf Land/States erlaubt!")
 		elif selected is NavalEntity:
-			if LandSystem and LandSystem.is_position_on_land(hit_pos):
+			if LandSystem and LandSystem.is_position_on_land(hit_pos)):
 				allow_move = false
 				print("[Movement] Naval kann nicht auf Land!")
 
 		if allow_move:
 			UnitManager.move_selected_to(hit_pos)
+			if globe:
+				globe.show_click_ring(hit_pos)  # Nice expanding fading ring feedback
 		else:
 			print("[Movement] Bewegung blockiert!")
 
