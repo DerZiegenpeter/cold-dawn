@@ -76,7 +76,7 @@ func _follow_path(delta: float) -> void:
 		MovementSystem.clear_path(self)
 		return
 
-	var waypoint := path[index]
+	var waypoint: Vector3 = path[index]
 
 	var current_dir := global_position.normalized()
 	var target_dir := waypoint.normalized()
