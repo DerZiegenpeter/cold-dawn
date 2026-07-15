@@ -61,7 +61,7 @@ func _input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	var t: float = clampf(smoothness * delta, 0.0, 1.0)
 	yaw = lerp(yaw, target_yaw, t)
-	pitch = lerp(pitch, target_pitch, t)
+	pitch = lerp(yaw, target_pitch, t)
 	distance = lerp(distance, target_distance, t * 0.65)
 	_update_position()
 
@@ -174,7 +174,7 @@ func _handle_right_click() -> void:
 				allow_move = false
 				print("[Movement] Nur auf Land/States erlaubt!")
 		elif selected is NavalEntity:
-			if LandSystem and LandSystem.is_position_on_land(hit_pos):
+			if LandSystem and LandSystem.is_position_on_land(hit_pos)):
 				allow_move = false
 				print("[Movement] Naval kann nicht auf Land!")
 
@@ -192,16 +192,32 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	if not globe: return Vector3.ZERO
 	var radius := globe.earth_radius * 1.002
 	var center := globe.global_position
+
 	var oc := from - center
 	var a := dir.dot(dir)
 	var b := 2.0 * oc.dot(dir)
 	var c := oc.dot(oc) - radius * radius
+
 	var discriminant := b * b - 4 * a * c
-	if discriminant < 0: return Vector3.ZERO
-	var t := (-b - sqrt(discriminant)) / (2.0 * a)
-	if t < 0: t = (-b + sqrt(discriminant)) / (2.0 * a)
-	if t < 0: return Vector3.ZERO
-	return center + dir * t * radius
+	if discriminant < 0:
+		return Vector3.ZERO
+
+	# Correct near-hit selection (front side of the globe)
+	var t1 := (-b - sqrt(discriminant)) / (2.0 * a)
+	var t2 := (-b + sqrt(discriminant)) / (2.0 * a)
+
+	var t := -1.0
+	if t1 > 0 and t2 > 0:
+		t = min(t1, t2)          # prefer the closer (front) intersection
+	elif t1 > 0:
+		t = t1
+	elif t2 > 0:
+		t = t2
+
+	if t < 0:
+		return Vector3.ZERO
+
+	return center + dir * t     # correct: t is already the distance along the ray
 
 func _try_select_state() -> void:
 	pass
