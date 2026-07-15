@@ -132,9 +132,7 @@ func deselect() -> void:
 
 func move_selected_to(world_pos: Vector3) -> void:
 	if selected_entity and is_instance_valid(selected_entity) and selected_entity.has_method("move_to"):
-		# End any active combat when giving a new move order
 		if CollisionSystem and CollisionSystem.has_method("end_combat"):
-			# End combat with all possible current combatants (simple approach)
 			for other in active_entities:
 				if other != selected_entity and CollisionSystem._are_enemies(selected_entity, other):
 					CollisionSystem.end_combat(selected_entity, other)
@@ -146,7 +144,6 @@ func move_selected_to(world_pos: Vector3) -> void:
 
 func update_fade_for_all(cam_distance: float) -> void:
 	var alpha := 1.0
-	# Fade entities when zoomed out (similar to states/cities)
 	if cam_distance > 1600:
 		alpha = 0.0
 	elif cam_distance > 1100:
@@ -159,10 +156,11 @@ func update_fade_for_all(cam_distance: float) -> void:
 
 # ==================== MOUSE PICKING ====================
 
-func get_entity_at_mouse(mouse_pos: Vector2, cam: Camera3D) -> Node:
+func get_entity_at_mouse(mouse_pos: Vector2, cam: Camera3D, max_pixel_dist: float = 25.0) -> Node:
 	if not cam or active_entities.is_empty():
 		return null
 
+	# Precise physics raycast first
 	var from := cam.project_ray_origin(mouse_pos)
 	var dir := cam.project_ray_normal(mouse_pos)
 	var space_state := cam.get_world_3d().direct_space_state
@@ -181,13 +179,14 @@ func get_entity_at_mouse(mouse_pos: Vector2, cam: Camera3D) -> Node:
 			if grandparent and grandparent in active_entities:
 				return grandparent
 
+	# Fallback: closest on screen (now with tighter threshold)
 	var closest: Node = null
 	var closest_dist := 999999.0
 	for e in active_entities:
 		if not is_instance_valid(e): continue
 		var screen_pos := cam.unproject_position(e.global_position)
 		var dist := screen_pos.distance_to(mouse_pos)
-		if dist < 50.0 and dist < closest_dist:
+		if dist < max_pixel_dist and dist < closest_dist:
 			closest_dist = dist
 			closest = e
 	return closest
