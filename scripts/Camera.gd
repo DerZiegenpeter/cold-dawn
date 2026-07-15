@@ -174,7 +174,7 @@ func _handle_right_click() -> void:
 				allow_move = false
 				print("[Movement] Nur auf Land/States erlaubt!")
 		elif selected is NavalEntity:
-			if LandSystem and LandSystem.is_position_on_land(hit_pos):
+			if LandSystem and LandSystem.is_position_on_land(hit_pos)):
 				allow_move = false
 				print("[Movement] Naval kann nicht auf Land!")
 
@@ -202,22 +202,20 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	if discriminant < 0:
 		return Vector3.ZERO
 
-	# Correct near-hit selection (front side of the globe)
 	var t1 := (-b - sqrt(discriminant)) / (2.0 * a)
 	var t2 := (-b + sqrt(discriminant)) / (2.0 * a)
 
-	var t := -1.0
-	if t1 > 0 and t2 > 0:
-		t = min(t1, t2)          # prefer the closer (front) intersection
-	elif t1 > 0:
-		t = t1
-	elif t2 > 0:
-		t = t2
+	# Always prefer the closest positive intersection (front side)
+	var t := INF
+	if t1 > 0.0001:
+		t = min(t, t1)
+	if t2 > 0.0001:
+		t = min(t, t2)
 
-	if t < 0:
+	if t == INF:
 		return Vector3.ZERO
 
-	return center + dir * t     # correct: t is already the distance along the ray
+	return center + dir * t
 
 func _try_select_state() -> void:
 	pass
