@@ -24,7 +24,7 @@ func _create_visual() -> void:
 	mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = "Visual"
 
-	var sphere := SphereMesh.new()
+	var sphere: SphereMesh = SphereMesh.new()
 	sphere.radius = ENTITY_SIZE * 0.65
 	sphere.height = ENTITY_SIZE * 1.3
 	sphere.radial_segments = 24
@@ -32,7 +32,7 @@ func _create_visual() -> void:
 
 	mesh_instance.mesh = sphere
 
-	var mat := StandardMaterial3D.new()
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.albedo_color = nation_color
@@ -55,11 +55,11 @@ func _process(delta: float) -> void:
 		last_valid_pos = global_position
 		return
 
-	var current_dir := global_position.normalized()
-	var target_dir := target_pos.normalized()
-	var angle := current_dir.angle_to(target_dir)
+	var current_dir: Vector3 = global_position.normalized()
+	var target_dir: Vector3 = target_pos.normalized()
+	var angle: float = current_dir.angle_to(target_dir)
 
-	var step := 0.75 * delta   # air faster
+	var step: float = 0.75 * delta   # air faster
 
 	if angle <= step:
 		global_position = target_pos
@@ -69,8 +69,8 @@ func _process(delta: float) -> void:
 		last_valid_pos = global_position
 		return
 
-	var t := step / angle
-	var new_dir := current_dir.slerp(target_dir, t)
+	var t: float = step / angle
+	var new_dir: Vector3 = current_dir.slerp(target_dir, t)
 	global_position = new_dir * global_position.length()
 
 	_orient_to_surface()
@@ -78,7 +78,7 @@ func _process(delta: float) -> void:
 
 func _orient_to_surface() -> void:
 	if not mesh_instance: return
-	var normal := global_position.normalized()
+	var normal: Vector3 = global_position.normalized()
 	if normal.length_squared() < 0.0001: return
 	mesh_instance.transform.basis = Basis.looking_at(normal, Vector3.UP)
 
@@ -100,12 +100,12 @@ func move_to(world_pos: Vector3) -> void:
 
 func update_fade(alpha: float) -> void:
 	if not mesh_instance: return
-	var mat := mesh_instance.material_override as StandardMaterial3D
+	var mat: StandardMaterial3D = mesh_instance.material_override as StandardMaterial3D
 	if mat: mat.albedo_color.a = alpha
 
 func _update_visual() -> void:
 	if not mesh_instance: return
-	var mat := mesh_instance.material_override as StandardMaterial3D
+	var mat: StandardMaterial3D = mesh_instance.material_override as StandardMaterial3D
 	if not mat: return
 
 	if is_selected:
