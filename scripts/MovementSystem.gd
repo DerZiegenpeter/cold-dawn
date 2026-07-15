@@ -1,7 +1,7 @@
 extends Node
 
 ## MovementSystem
-## Path-based movement with visualization
+## Velocity-based smooth movement with paths
 
 var _path_visualizer: MeshInstance3D = null
 
@@ -22,11 +22,9 @@ func request_move(entity: Node, target_world_pos: Vector3) -> bool:
 	if is_naval:
 		if LandSystem and LandSystem.is_position_on_land(target_world_pos):
 			valid = false
-			print("[MovementSystem] Naval kann nicht auf Land!")
 	else:
 		if LandSystem and not LandSystem.is_position_on_land(target_world_pos):
 			valid = false
-			print("[MovementSystem] Nur auf Land!")
 
 	if not valid:
 		return false
@@ -35,9 +33,10 @@ func request_move(entity: Node, target_world_pos: Vector3) -> bool:
 
 	entity.set_meta("current_path", path)
 	entity.set_meta("current_path_index", 0)
+	entity.set_meta("velocity", Vector3.ZERO)
 
 	if path.size() > 0:
-		_set_target_position(entity, path[0])
+		entity.set_meta("target_pos", path[0])
 
 	_show_path_visualization(globe, path)
 
@@ -54,14 +53,12 @@ func generate_path_on_sphere(start: Vector3, end: Vector3, segments: int = 8) ->
 
 	return path
 
-func _set_target_position(entity: Node, world_pos: Vector3) -> void:
-	if entity.has_method("_set_target_position"):
-		entity._set_target_position(world_pos)
-
 func clear_path(entity: Node) -> void:
 	if is_instance_valid(entity):
 		entity.set_meta("current_path", [])
 		entity.set_meta("current_path_index", 0)
+		entity.set_meta("velocity", Vector3.ZERO)
+		entity.set_meta("target_pos", Vector3.ZERO)
 		_hide_path_visualization()
 
 func has_active_path(entity: Node) -> bool:
@@ -84,10 +81,10 @@ func _show_path_visualization(globe: Node, path: Array) -> void:
 
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.emission_enabled = true
-	material.emission = Color(0.9, 0.95, 1.0)
-	material.emission_energy_multiplier = 2.5
+	material.emission = Color(0.85, 0.9, 1.0)
+	material.emission_energy_multiplier = 2.2
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(1, 1, 1, 0.7)
+	material.albedo_color = Color(1, 1, 1, 0.65)
 	material.render_priority = 40
 
 	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, material)
