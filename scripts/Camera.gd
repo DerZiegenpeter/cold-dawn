@@ -51,6 +51,8 @@ func _input(event: InputEvent) -> void:
 			if distance < 800:
 				zoom_factor = lerp(1.007, 1.04, clamp((distance - 505) / 295.0, 0.0, 1.0))
 			target_distance = min(max_distance, target_distance * zoom_factor)
+		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			pass
 	elif event is InputEventMouseMotion and is_dragging:
 		var delta: Vector2 = event.position - last_mouse_pos
 		var current_sens: float = sensitivity * clampf(distance / 1100.0, 0.25, 1.0)
@@ -76,7 +78,7 @@ func _update_position() -> void:
 	var dir := Vector3(
 		cos(deg_to_rad(yaw)) * cos(deg_to_rad(pitch)),
 		sin(deg_to_rad(pitch)),
-		sin(deg_to_rad(yaw)) * cos(deg_to_rad(pitch))
+		 sin(deg_to_rad(yaw)) * cos(deg_to_rad(pitch))
 	).normalized()
 	global_position = target.global_position + dir * distance
 	look_at(target.global_position, Vector3.UP)
@@ -152,13 +154,22 @@ func _handle_right_click() -> void:
 	var mouse_pos := get_viewport().get_mouse_position()
 	var from := project_ray_origin(mouse_pos)
 	var dir := project_ray_normal(mouse_pos)
-	var hit_pos := _raycast_to_globe_sphere(from, dir)
 
+	# Check if we right-clicked on/near another unit (for manual Battle)
+	var target_entity = UnitManager.get_entity_at_mouse(mouse_pos, self)
+	if target_entity and target_entity != UnitManager.selected_entity:
+		if CollisionSystem and CollisionSystem._are_enemies(UnitManager.selected_entity, target_entity):
+			# Manual Battle start with brighter marker
+			if CollisionSystem.has_method("start_battle"):
+				CollisionSystem.start_battle(UnitManager.selected_entity, target_entity)
+			return
+
+	# Normal move to position on globe
+	var hit_pos := _raycast_to_globe_sphere(from, dir)
 	if hit_pos != Vector3.ZERO:
 		var selected = UnitManager.selected_entity
 		var allow_move := true
 
-		# Nur GroundEntities sind auf Land beschränkt
 		if selected is GroundEntity:
 			if not (LandSystem and LandSystem.is_position_on_land(hit_pos)):
 				allow_move = false
@@ -186,16 +197,7 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	var t := (-b - sqrt(discriminant)) / (2.0 * a)
 	if t < 0: t = (-b + sqrt(discriminant)) / (2.0 * a)
 	if t < 0: return Vector3.ZERO
-	return from + dir * t
+	return center + dir * t * radius
 
 func _try_select_state() -> void:
-	if not globe: return
-	print("[Click] Linksklick erkannt")
-	var mouse_pos := get_viewport().get_mouse_position()
-	var from := project_ray_origin(mouse_pos)
-	var dir := project_ray_normal(mouse_pos)
-	var hit := _raycast_to_globe_sphere(from, dir)
-	if hit != Vector3.ZERO:
-		print("[Click] Hit Globe at: ", hit)
-	else:
-		print("[Click] Kein Hit auf Globe")
+	pass
