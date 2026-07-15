@@ -30,22 +30,22 @@ func _get_entity_type(entity: Node) -> String:
 	return "ground"
 
 func get_angular_speed(entity: Node) -> float:
-	var t := _get_entity_type(entity)
-	return ENTITY_SPEEDS.get(t, 0.5)
+	var t: String = _get_entity_type(entity)
+	return float(ENTITY_SPEEDS.get(t, 0.5))
 
 func request_move(entity: Node, target_world_pos: Vector3) -> bool:
 	if not is_instance_valid(entity):
 		return false
 
-	var etype := _get_entity_type(entity)
-	var is_naval := etype == "naval"
-	var is_air := etype == "air"
+	var etype: String = _get_entity_type(entity)
+	var is_naval: bool = etype == "naval"
+	var is_air: bool = etype == "air"
 
-	var globe := entity.get_parent() if entity.has_method("get_globe") else null
+	var globe: Node = entity.get_parent() if entity.has_method("get_globe") else null
 	if not globe:
 		globe = entity.get_parent()
 
-	var valid := true
+	var valid: bool = true
 
 	if is_naval:
 		if LandSystem and LandSystem.is_position_on_land(target_world_pos):
@@ -58,7 +58,7 @@ func request_move(entity: Node, target_world_pos: Vector3) -> bool:
 		print("[MovementSystem] Move blocked: ", etype, " cannot go to this domain")
 		return false
 
-	var path := generate_path_on_sphere(entity.global_position, target_world_pos, 6)
+	var path: Array[Vector3] = generate_path_on_sphere(entity.global_position, target_world_pos, 6)
 
 	entity.set_meta("current_path", path)
 	entity.set_meta("current_path_index", 0)
@@ -74,15 +74,15 @@ func request_move(entity: Node, target_world_pos: Vector3) -> bool:
 func generate_path_on_sphere(start: Vector3, end: Vector3, min_segments: int = 6) -> Array[Vector3]:
 	if start.is_equal_approx(end):
 		return [end]
-	var angle := start.angle_to(end)
+	var angle: float = start.angle_to(end)
 	# Adaptive segments based on angular distance (~every 4 degrees) so long routes have more detail, not fixed length
-	var segments := max(min_segments, int(ceil(angle / deg_to_rad(4.0))))
-	segments = min(segments, 48)
+	var segments: int = maxi(min_segments, int(ceil(angle / deg_to_rad(4.0))))
+	segments = mini(segments, 48)
 	var path: Array[Vector3] = []
-	var radius := start.length()
+	var radius: float = start.length()
 	for i in range(segments + 1):
-		var t := float(i) / float(segments)
-		var pos := start.slerp(end, t)
+		var t: float = float(i) / float(segments)
+		var pos: Vector3 = start.slerp(end, t)
 		path.append(pos.normalized() * radius)
 	return path
 
@@ -97,7 +97,7 @@ func clear_path(entity: Node) -> void:
 func has_active_path(entity: Node) -> bool:
 	if not is_instance_valid(entity):
 		return false
-	var path = entity.get_meta("current_path", [])
+	var path: Array = entity.get_meta("current_path", []) as Array
 	return path is Array and path.size() > 0
 
 func update_movement(entity: Node, delta: float) -> void:
@@ -105,25 +105,25 @@ func update_movement(entity: Node, delta: float) -> void:
 	if not has_active_path(entity) or not is_instance_valid(entity):
 		return
 
-	var path: Array = entity.get_meta("current_path", [])
+	var path: Array = entity.get_meta("current_path", []) as Array
 	var index: int = entity.get_meta("current_path_index", 0)
 
-	var etype := _get_entity_type(entity)
-	var speed := get_angular_speed(entity)
-	var requires_land := etype == "ground"
-	var requires_water := etype == "naval"
+	var etype: String = _get_entity_type(entity)
+	var speed: float = get_angular_speed(entity)
+	var requires_land: bool = etype == "ground"
+	var requires_water: bool = etype == "naval"
 
 	if path.size() == 0 or index >= path.size():
 		clear_path(entity)
 		return
 
 	var waypoint: Vector3 = path[index]
-	var current_pos := entity.global_position
-	var current_dir := current_pos.normalized()
-	var target_dir := waypoint.normalized()
-	var angle := current_dir.angle_to(target_dir)
+	var current_pos: Vector3 = entity.global_position
+	var current_dir: Vector3 = current_pos.normalized()
+	var target_dir: Vector3 = waypoint.normalized()
+	var angle: float = current_dir.angle_to(target_dir)
 
-	var step := speed * delta
+	var step: float = speed * delta
 
 	if angle <= step or angle < 0.001:
 		entity.global_position = waypoint
@@ -138,14 +138,14 @@ func update_movement(entity: Node, delta: float) -> void:
 				entity.last_valid_pos = entity.global_position
 			return
 	else:
-		var t := step / angle if angle > 0.001 else 1.0
-		var new_dir := current_dir.slerp(target_dir, clamp(t, 0.0, 1.0))
+		var t: float = step / angle if angle > 0.001 else 1.0
+		var new_dir: Vector3 = current_dir.slerp(target_dir, clampf(t, 0.0, 1.0))
 		entity.global_position = new_dir * current_pos.length()
 
 	# Enforce domain rules after every movement step (prevents crossing forbidden terrain mid-path)
 	if LandSystem:
-		var on_land := LandSystem.is_position_on_land(entity.global_position)
-		var valid := true
+		var on_land: bool = LandSystem.is_position_on_land(entity.global_position)
+		var valid: bool = true
 		if requires_land and not on_land:
 			valid = false
 		elif requires_water and on_land:
@@ -167,11 +167,11 @@ func _show_path_visualization(globe: Node, path: Array) -> void:
 	if path.size() < 2 or not globe:
 		return
 
-	var mesh_instance := MeshInstance3D.new()
+	var mesh_instance: MeshInstance3D = MeshInstance3D.new()
 	mesh_instance.name = "PathVisualizer"
 
-	var immediate_mesh := ImmediateMesh.new()
-	var material := StandardMaterial3D.new()
+	var immediate_mesh: ImmediateMesh = ImmediateMesh.new()
+	var material: StandardMaterial3D = StandardMaterial3D.new()
 
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.emission_enabled = true
