@@ -66,7 +66,6 @@ func load_and_spawn_oob(oob_path: String = "res://data/oob.json") -> void:
 	print("[UnitManager] ", active_entities.size(), " Entities gespawnt")
 
 func _process(delta: float) -> void:
-	# Central collision resolution - was previously called from EVERY entity every frame (O(n³) !)
 	if CollisionSystem:
 		CollisionSystem.resolve_collisions(active_entities)
 
@@ -123,7 +122,6 @@ func select_entity(entity: Node) -> void:
 	selected_entity = entity
 	if entity.has_method("set_selected"):
 		entity.set_selected(true)
-	# Safe print (Node always has .name, no need for .has("name"))
 	print("[UnitManager] Selected: ", entity.name)
 
 func deselect() -> void:
@@ -134,6 +132,13 @@ func deselect() -> void:
 
 func move_selected_to(world_pos: Vector3) -> void:
 	if selected_entity and is_instance_valid(selected_entity) and selected_entity.has_method("move_to"):
+		# End any active combat when giving a new move order
+		if CollisionSystem and CollisionSystem.has_method("end_combat"):
+			# End combat with all possible current combatants (simple approach)
+			for other in active_entities:
+				if other != selected_entity and CollisionSystem._are_enemies(selected_entity, other):
+					CollisionSystem.end_combat(selected_entity, other)
+
 		selected_entity.move_to(world_pos)
 		print("[UnitManager] Move requested for selected entity")
 
@@ -158,12 +163,11 @@ func get_entity_at_mouse(mouse_pos: Vector2, cam: Camera3D) -> Node:
 	if not cam or active_entities.is_empty():
 		return null
 
-	# First try physics raycast (works for Ground + Naval which have CollisionArea)
 	var from := cam.project_ray_origin(mouse_pos)
 	var dir := cam.project_ray_normal(mouse_pos)
 	var space_state := cam.get_world_3d().direct_space_state
 	var query := PhysicsRayQueryParameters3D.create(from, from + dir * 20000.0)
-	query.collision_mask = 1  # CollisionArea layer
+	query.collision_mask = 1
 	query.collide_with_areas = true
 	var result := space_state.intersect_ray(query)
 
@@ -172,20 +176,18 @@ func get_entity_at_mouse(mouse_pos: Vector2, cam: Camera3D) -> Node:
 		var parent: Node = collider.get_parent() if is_instance_valid(collider) else null
 		if parent and parent in active_entities:
 			return parent
-		# Sometimes collider is deeper (CollisionArea is child of entity)
 		if parent:
 			var grandparent: Node = parent.get_parent()
 			if grandparent and grandparent in active_entities:
 				return grandparent
 
-	# Fallback for AirEntity (no CollisionArea) or missed hits: closest on screen
 	var closest: Node = null
 	var closest_dist := 999999.0
 	for e in active_entities:
 		if not is_instance_valid(e): continue
 		var screen_pos := cam.unproject_position(e.global_position)
 		var dist := screen_pos.distance_to(mouse_pos)
-		if dist < 50.0 and dist < closest_dist:  # ~50 pixel click radius
+		if dist < 50.0 and dist < closest_dist:
 			closest_dist = dist
 			closest = e
 	return closest
