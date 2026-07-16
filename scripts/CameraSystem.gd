@@ -1,4 +1,4 @@
-extends Node
+extends Node3D
 
 @export var start_distance: float = 1400.0
 @export var min_distance: float = 505.0
