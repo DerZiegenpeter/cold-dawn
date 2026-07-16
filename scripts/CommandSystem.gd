@@ -12,7 +12,7 @@ func issue_move_command(entity: Node, target_world_pos: Vector3) -> void:
 	if not is_instance_valid(entity):
 		return
 
-	var path := pathfinding.generate_path(entity, target_world_pos)
+	var path: Array[Vector3] = pathfinding.generate_path(entity, target_world_pos)
 	if path.is_empty():
 		return
 
