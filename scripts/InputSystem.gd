@@ -55,13 +55,17 @@ func _handle_right_click() -> void:
 
 	var target_entity = unit_manager.get_entity_at_mouse(mouse_pos, cam, 20.0)
 	if target_entity and target_entity != unit_manager.selected_entity:
-		if command_system:
-			command_system.try_attack(unit_manager.selected_entity, target_entity)
+		var attacker_3d := unit_manager.selected_entity as Node3D
+		var target_3d := target_entity as Node3D
+		if attacker_3d and target_3d and command_system:
+			command_system.try_attack(attacker_3d, target_3d)
 		return
 
 	var hit_pos := _raycast_to_globe(mouse_pos, cam)
 	if hit_pos != Vector3.ZERO:
-		command_system.issue_move_command(unit_manager.selected_entity, hit_pos)
+		var selected_3d := unit_manager.selected_entity as Node3D
+		if selected_3d and command_system:
+			command_system.issue_move_command(selected_3d, hit_pos)
 
 func _raycast_to_globe(mouse_pos: Vector2, cam: Camera3D) -> Vector3:
 	var from := cam.project_ray_origin(mouse_pos)
