@@ -155,9 +155,12 @@ func _handle_right_click() -> void:
 	var target_entity = UnitManager.get_entity_at_mouse(mouse_pos, self, 20.0)  # strict 20px
 	if target_entity and target_entity != UnitManager.selected_entity:
 		if CollisionSystem and CollisionSystem._are_enemies(UnitManager.selected_entity, target_entity):
-			if CollisionSystem.has_method("start_battle"):
-				CollisionSystem.start_battle(UnitManager.selected_entity, target_entity)
-			return  # Started Battle, do not move
+			# Only start battle if reasonably close (prevents far combat markers)
+			var dist := UnitManager.selected_entity.global_position.distance_to(target_entity.global_position)
+			if dist < 80.0:  # reasonable world distance for manual battle start
+				if CollisionSystem.has_method("start_battle"):
+					CollisionSystem.start_battle(UnitManager.selected_entity, target_entity)
+				return
 
 	# Normal movement to globe position
 	var from := project_ray_origin(mouse_pos)
@@ -174,7 +177,7 @@ func _handle_right_click() -> void:
 				allow_move = false
 				print("[Movement] Nur auf Land/States erlaubt!")
 		elif selected is NavalEntity:
-			if LandSystem and LandSystem.is_position_on_land(hit_pos):
+			if LandSystem and LandSystem.is_position_on_land(hit_pos)):
 				allow_move = false
 				print("[Movement] Naval kann nicht auf Land!")
 
@@ -204,17 +207,24 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	if discriminant < 0:
 		return Vector3.ZERO
 
-	var t1 := (-b - sqrt(discriminant)) / (2.0 * a)
-	var t2 := (-b + sqrt(discriminant)) / (2.0 * a)
+	var sqrt_disc := sqrt(discriminant)
+	var t1 := (-b - sqrt_disc) / (2.0 * a)
+	var t2 := (-b + sqrt_disc) / (2.0 * a)
 
-	# Always prefer the closest positive intersection (front side)
-	var t := INF
-	if t1 > 0.0001:
-		t = min(t, t1)
-	if t2 > 0.0001:
-		t = min(t, t2)
+	# Robust near-hit selection: always prefer the closest positive intersection in front of camera
+	var t := -1.0
+	if t1 > 0.0001 and t2 > 0.0001:
+		t = min(t1, t2)
+	elif t1 > 0.0001:
+		t = t1
+	elif t2 > 0.0001:
+		t = t2
 
-	if t == INF:
+	if t < 0:
+		return Vector3.ZERO
+
+	# Safety: reject extremely far hits (prevents back-side glitches)
+	if t > 5000:
 		return Vector3.ZERO
 
 	return center + dir * t
