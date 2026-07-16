@@ -25,9 +25,15 @@ func issue_move_command(entity: Node, target_world_pos: Vector3) -> void:
 func try_attack(attacker: Node, target: Node) -> void:
 	if not is_instance_valid(attacker) or not is_instance_valid(target):
 		return
+
+	var attacker_3d := attacker as Node3D
+	var target_3d := target as Node3D
+	if not attacker_3d or not target_3d:
+		return
+
 	if collision and collision._are_enemies(attacker, target):
-		var dist := attacker.global_position.distance_to(target.global_position)
+		var dist := attacker_3d.global_position.distance_to(target_3d.global_position)
 		if dist < 80.0:
 			collision.start_battle(attacker, target)
 		else:
-			issue_move_command(attacker, target.global_position)
+			issue_move_command(attacker, target_3d.global_position)
