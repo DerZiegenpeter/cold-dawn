@@ -177,7 +177,7 @@ func _handle_right_click() -> void:
 				allow_move = false
 				print("[Movement] Nur auf Land/States erlaubt!")
 		elif selected is NavalEntity:
-			if LandSystem and LandSystem.is_position_on_land(hit_pos)):
+			if LandSystem and LandSystem.is_position_on_land(hit_pos):
 				allow_move = false
 				print("[Movement] Naval kann nicht auf Land!")
 
@@ -208,8 +208,8 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 		return Vector3.ZERO
 
 	var sqrt_disc := sqrt(discriminant)
-	var t1 := (-b - sqrt_disc) / (2.0 * a)
-	var t2 := (-b + sqrt_disc) / (2.0 * a)
+	var t1 := (-b - sqrt(discriminant)) / (2.0 * a)
+	var t2 := (-b + sqrt(discriminant)) / (2.0 * a)
 
 	# Robust near-hit selection: always prefer the closest positive intersection in front of camera
 	var t := -1.0
