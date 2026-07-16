@@ -128,17 +128,6 @@ func _show_path_visualization(globe: Node, path: Array) -> void:
 	globe.add_child(mesh_instance)
 	_path_visualizer = mesh_instance
 
-func clear_path(entity: Node) -> void:
-	if is_instance_valid(entity):
-		entity.set_meta("current_path", [])
-		entity.set_meta("current_path_index", 0)
-		_hide_path_visualization()
-
-func has_active_path(entity: Node) -> bool:
-	if not is_instance_valid(entity): return false
-	var raw = entity.get_meta("current_path", [])
-	return raw is Array and (raw as Array).size() > 0
-
 func _hide_path_visualization() -> void:
 	if _path_visualizer and is_instance_valid(_path_visualizer):
 		_path_visualizer.queue_free()
