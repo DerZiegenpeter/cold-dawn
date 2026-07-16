@@ -156,7 +156,7 @@ func _handle_right_click() -> void:
 	if target_entity and target_entity != UnitManager.selected_entity:
 		if CollisionSystem and CollisionSystem._are_enemies(UnitManager.selected_entity, target_entity):
 			# Only start battle if reasonably close (prevents far combat markers)
-			var dist := UnitManager.selected_entity.global_position.distance_to(target_entity.global_position)
+			var dist: float = UnitManager.selected_entity.global_position.distance_to(target_entity.global_position)
 			if dist < 80.0:  # reasonable world distance for manual battle start
 				if CollisionSystem.has_method("start_battle"):
 					CollisionSystem.start_battle(UnitManager.selected_entity, target_entity)
