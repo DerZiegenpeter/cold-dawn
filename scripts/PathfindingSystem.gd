@@ -1,5 +1,4 @@
 extends Node
-class_name PathfindingSystem
 
 ## PathfindingSystem
 ## Zuständig für die Generierung von Pfaden (direkt + Umwege für Ground/Naval).
