@@ -1,8 +1,5 @@
 extends Node
 
-## PathfindingSystem
-## Zuständig für die Generierung von Pfaden (direkt + Umwege für Ground/Naval).
-
 func generate_path(entity: Node3D, target: Vector3) -> Array[Vector3]:
 	if not is_instance_valid(entity):
 		return []

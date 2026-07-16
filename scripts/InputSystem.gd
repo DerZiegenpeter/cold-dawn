@@ -1,9 +1,5 @@
 extends Node
 
-## InputSystem
-## Zentrale Stelle für alle Maus- und Tastatureingaben.
-## Delegiert an CommandSystem und CameraSystem.
-
 @onready var camera_system = get_node("/root/CameraSystem")
 @onready var command_system = get_node("/root/CommandSystem")
 @onready var unit_manager = get_node("/root/UnitManager")

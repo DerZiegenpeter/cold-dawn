@@ -1,8 +1,5 @@
 extends Node
 
-## CameraSystem
-## Reine Kamera-Logik (Orbit, Zoom, Smoothing). Keine Input- oder Spiel-Logik.
-
 @export var start_distance: float = 1400.0
 @export var min_distance: float = 505.0
 @export var max_distance: float = 2200.0
