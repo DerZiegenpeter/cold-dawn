@@ -1,5 +1,4 @@
 extends Node
-class_name CameraSystem
 
 ## CameraSystem
 ## Reine Kamera-Logik (Orbit, Zoom, Smoothing). Keine Input- oder Spiel-Logik.
