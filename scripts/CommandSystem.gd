@@ -12,7 +12,7 @@ func issue_move_command(entity: Node, target_world_pos: Vector3) -> void:
 	if not is_instance_valid(entity):
 		return
 
-	var path: Array[Vector3] = pathfinding.generate_path(entity, target_world_pos)
+	var path: Array[Vector3] = pathfinding.generate_path(entity as Node3D, target_world_pos)
 	if path.is_empty():
 		return
 
@@ -26,9 +26,9 @@ func try_attack(attacker: Node, target: Node) -> void:
 	if not is_instance_valid(attacker) or not is_instance_valid(target):
 		return
 
-	var attacker_3d := attacker as Node3D
-	var target_3d := target as Node3D
-	if not attacker_3d or not target_3d:
+	var attacker_3d: Node3D = attacker as Node3D
+	var target_3d: Node3D = target as Node3D
+	if attacker_3d == null or target_3d == null:
 		return
 
 	if collision and collision._are_enemies(attacker, target):
