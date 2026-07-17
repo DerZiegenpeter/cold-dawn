@@ -195,7 +195,7 @@ func _show_path_visualization(globe: Node, path: Array) -> void:
 	material.render_priority = 50
 
 	var lift: float = 5.0
-immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, material)
+	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, material)
 	for pos in path:
 		if pos is Vector3:
 			var lifted: Vector3 = pos.normalized() * (pos.length() + lift)
