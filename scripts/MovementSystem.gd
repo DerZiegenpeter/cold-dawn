@@ -1,8 +1,7 @@
 extends Node
 
 ## MovementSystem
-## Führt Bewegung entlang eines bereits generierten Pfades aus.
-## Path-Generierung liegt jetzt im PathfindingSystem.
+## Path-Generierung + Bewegung ausführen
 
 var _path_visualizer: MeshInstance3D = null
 
@@ -23,6 +22,67 @@ func _get_entity_type(entity: Node) -> String:
 	if entity is GroundEntity: return "ground"
 	if entity is NavalEntity: return "naval"
 	return "ground"
+
+func request_move(entity: Node, target_world_pos: Vector3) -> bool:
+	if not is_instance_valid(entity):
+		return false
+
+	var entity_3d: Node3D = entity as Node3D
+	if entity_3d == null:
+		return false
+
+	var etype: String = _get_entity_type(entity)
+	var is_naval: bool = etype == "naval"
+	var is_air: bool = etype == "air"
+
+	# Domain check at target
+	var valid: bool = true
+	if is_naval:
+		if LandSystem and LandSystem.is_position_on_land(target_world_pos):
+			valid = false
+	elif not is_air:
+		if LandSystem and not LandSystem.is_position_on_land(target_world_pos):
+			valid = false
+
+	if not valid:
+		print("[Movement] Ziel nicht erreichbar für ", etype)
+		return false
+
+	# Generate path
+	var path: Array[Vector3] = []
+	if PathfindingSystem and PathfindingSystem.has_method("generate_path"):
+		path = PathfindingSystem.generate_path(entity_3d, target_world_pos)
+	else:
+		# Fallback: direct path
+		path = _generate_direct_path(entity_3d.global_position, target_world_pos)
+
+	if path.is_empty():
+		return false
+
+	entity.set_meta("current_path", path)
+	entity.set_meta("current_path_index", 0)
+
+	var globe: Node = entity.get_parent()
+	_show_path_visualization(globe, path)
+	return true
+
+func _generate_direct_path(start: Vector3, end: Vector3) -> Array[Vector3]:
+	if start.is_equal_approx(end):
+		return [end]
+	var start_dir: Vector3 = start.normalized()
+	var end_dir: Vector3 = end.normalized()
+	var angle: float = start_dir.angle_to(end_dir)
+	var segments: int = maxi(8, int(ceil(angle / deg_to_rad(4.5))))
+	segments = mini(segments, 48)
+
+	var path: Array[Vector3] = []
+	var radius: float = start.length()
+	for i in range(segments + 1):
+		var t: float = float(i) / float(segments)
+		var dir: Vector3 = start_dir.slerp(end_dir, t)
+		path.append(dir * radius)
+	path[path.size() - 1] = end_dir * radius
+	return path
 
 func clear_path(entity: Node) -> void:
 	if is_instance_valid(entity):
