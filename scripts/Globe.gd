@@ -34,13 +34,15 @@ func get_state_polygons() -> Dictionary:
 func get_state_centers() -> Dictionary:
 	return state_centers
 
-# Robust sphere raycast - always returns the closest front-side hit
+# Robust sphere raycast – always returns the closest front-side hit
 func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	var radius: float = earth_radius * 1.002
 	var center: Vector3 = global_position
 
 	var oc: Vector3 = from - center
 	var a: float = dir.dot(dir)
+	if a < 0.000001:
+		return Vector3.ZERO
 	var b: float = 2.0 * oc.dot(dir)
 	var c: float = oc.dot(oc) - radius * radius
 
@@ -67,7 +69,15 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	if t > 8000.0:
 		return Vector3.ZERO
 
-	return center + dir * t
+	var hit: Vector3 = center + dir * t
+
+	# Extra front-side guard (prevents rare back-face hits when camera is very close)
+	var to_cam: Vector3 = (from - center).normalized()
+	var to_hit: Vector3 = (hit - center).normalized()
+	if to_hit.dot(to_cam) < -0.05:
+		return Vector3.ZERO
+
+	return hit
 
 func show_click_ring(world_pos: Vector3) -> void:
 	var ring := MeshInstance3D.new()

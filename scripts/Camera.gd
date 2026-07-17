@@ -76,7 +76,7 @@ func _update_position() -> void:
 	var dir := Vector3(
 		cos(deg_to_rad(yaw)) * cos(deg_to_rad(pitch)),
 		sin(deg_to_rad(pitch)),
-		 sin(deg_to_rad(yaw)) * cos(deg_to_rad(pitch))
+		sin(deg_to_rad(yaw)) * cos(deg_to_rad(pitch))
 	).normalized()
 	global_position = target.global_position + dir * distance
 	look_at(target.global_position, Vector3.UP)
@@ -93,25 +93,32 @@ func _fade_coastlines() -> void:
 	elif distance < 900:
 		alpha = clamp((distance - 550) / 350.0, 0.0, 1.0)
 	var col = mat.albedo_color
-	col.a = lerp(col.a, 0.15, alpha)
+	# Absolute target alpha (prevents sticky values)
+	col.a = lerp(0.15, 1.0, alpha) if alpha > 0.0 else 0.15
+	if distance < 550:
+		col.a = 0.0
 	mat.albedo_color = col
 
 func _fade_all_states() -> void:
 	if not globe: return
+	# Absolute alpha based purely on camera distance.
+	# States only become visible together with cities when zoomed in close.
+	var target_alpha := 0.0
+	if distance < states_fade_end:
+		target_alpha = 1.0
+	elif distance < states_fade_start:
+		target_alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
+	else:
+		target_alpha = 0.0
+
 	for child in globe.get_children():
 		if child is MeshInstance3D and child.name.begins_with("State_"):
 			var mat := child.material_override as StandardMaterial3D
 			if not mat: continue
-			var alpha := 1.0
-			if distance > states_fade_start:
-				alpha = 0.0
-			elif distance < states_fade_end:
-				alpha = 1.0
-			else:
-				alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
 			var col = mat.albedo_color
-			col.a = lerp(col.a, 0.4, alpha)
-			if distance < states_fade_end + 30:
+			# Absolute set – never depends on previous frame value
+			col.a = target_alpha * 0.55
+			if distance < states_fade_end + 20.0:
 				col.a = 1.0
 			mat.albedo_color = col
 
@@ -120,16 +127,19 @@ func _fade_cities() -> void:
 	if not cities_node: return
 	var mat := cities_node.material_override as StandardMaterial3D
 	if not mat: return
-	var alpha := 1.0
-	if distance > states_fade_start:
-		alpha = 0.0
-	elif distance < states_fade_end:
-		alpha = 1.0
+
+	# Same thresholds as states so they appear/disappear together
+	var target_alpha := 0.0
+	if distance < states_fade_end:
+		target_alpha = 1.0
+	elif distance < states_fade_start:
+		target_alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
 	else:
-		alpha = clamp((states_fade_start - distance) / (states_fade_start - states_fade_end), 0.0, 1.0)
+		target_alpha = 0.0
+
 	var col = mat.albedo_color
-	col.a = lerp(col.a, 0.4, alpha)
-	if distance < states_fade_end + 30:
+	col.a = target_alpha * 0.7
+	if distance < states_fade_end + 20.0:
 		col.a = 1.0
 	mat.albedo_color = col
 
@@ -160,7 +170,7 @@ func _handle_right_click() -> void:
 					CollisionSystem.start_battle(UnitManager.selected_entity, target_entity)
 				return
 
-	# Movement
+	# Movement – always use the robust raycast that prefers the front-side hit
 	var from := project_ray_origin(mouse_pos)
 	var dir := project_ray_normal(mouse_pos)
 	var hit_pos := _raycast_to_globe_sphere(from, dir)
@@ -179,8 +189,10 @@ func _handle_right_click() -> void:
 				print("[Movement] Naval kann nicht auf Land!")
 
 		if allow_move:
-			# Use CommandSystem if available, otherwise fallback to UnitManager
-			if has_node("/root/CommandSystem") and get_node("/root/CommandSystem").has_method("issue_move_command"):
+			# Prefer MovementSystem so path visualization is created
+			if MovementSystem and MovementSystem.has_method("request_move"):
+				MovementSystem.request_move(selected, hit_pos)
+			elif has_node("/root/CommandSystem") and get_node("/root/CommandSystem").has_method("issue_move_command"):
 				get_node("/root/CommandSystem").issue_move_command(selected, hit_pos)
 			else:
 				UnitManager.move_selected_to(hit_pos)
@@ -194,33 +206,58 @@ func _did_hit_anything(mouse_pos: Vector2) -> bool:
 	var entity = UnitManager.get_entity_at_mouse(mouse_pos, self)
 	return entity != null
 
+# Robust sphere raycast – ALWAYS returns the closest front-side intersection
 func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
-	if not globe: return Vector3.ZERO
+	if not globe:
+		return Vector3.ZERO
+
+	# Prefer the Globe's own implementation when available (more battle-tested)
+	if globe.has_method("_raycast_to_globe_sphere"):
+		var hit: Vector3 = globe._raycast_to_globe_sphere(from, dir)
+		if hit != Vector3.ZERO:
+			# Extra safety: reject true back-side hits
+			var center: Vector3 = globe.global_position
+			var to_cam: Vector3 = (from - center).normalized()
+			var to_hit: Vector3 = (hit - center).normalized()
+			if to_hit.dot(to_cam) > -0.05:  # roughly front hemisphere relative to camera
+				return hit
+
+	# Fallback implementation (identical math, prioritises nearest positive t)
 	var radius: float = globe.earth_radius * 1.002
 	var center: Vector3 = globe.global_position
 
 	var oc: Vector3 = from - center
 	var a: float = dir.dot(dir)
+	if a < 0.000001:
+		return Vector3.ZERO
 	var b: float = 2.0 * oc.dot(dir)
 	var c: float = oc.dot(oc) - radius * radius
 
-	var discriminant: float = b * b - 4 * a * c
-	if discriminant < 0:
+	var discriminant: float = b * b - 4.0 * a * c
+	if discriminant < 0.0:
 		return Vector3.ZERO
 
 	var sqrt_disc: float = sqrt(discriminant)
-	var t1: float = (-b - sqrt_disc) / (2.0 * a)
-	var t2: float = (-b + sqrt_disc) / (2.0 * a)
+	var inv_2a: float = 1.0 / (2.0 * a)
+	var t0: float = (-b - sqrt_disc) * inv_2a
+	var t1: float = (-b + sqrt_disc) * inv_2a
 
+	# Choose the nearest positive intersection (front face when camera is outside)
 	var t: float = -1.0
-	if t1 > 0.0001 and t2 > 0.0001:
-		t = min(t1, t2)
-	elif t1 > 0.0001:
+	if t0 > 0.001:
+		t = t0
+	if t1 > 0.001 and (t < 0.0 or t1 < t):
 		t = t1
-	elif t2 > 0.0001:
-		t = t2
 
-	if t < 0 or t > 5000:
+	if t < 0.0 or t > 8000.0:
 		return Vector3.ZERO
 
-	return center + dir * t
+	var hit: Vector3 = center + dir * t
+
+	# Final front-side guard: reject if the hit is on the opposite side of the globe
+	var to_cam: Vector3 = (from - center).normalized()
+	var to_hit: Vector3 = (hit - center).normalized()
+	if to_hit.dot(to_cam) < -0.05:
+		return Vector3.ZERO
+
+	return hit

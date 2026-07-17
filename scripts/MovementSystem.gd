@@ -1,10 +1,12 @@
 extends Node
 
 ## MovementSystem
-## Clean modern movement: receives a target, asks PathfindingSystem for a path,
-## shows a nice path, then moves the entity along it.
+## Receives a target, asks PathfindingSystem for a path (respecting land/water),
+## shows a nice glowing path on the globe, then moves the entity along it
+## using spherical interpolation.
 
 var _path_visualizer: MeshInstance3D = null
+var _current_visualized_entity: Node = null
 
 const ENTITY_SPEEDS := {
 	"ground": 1.4,
@@ -21,26 +23,30 @@ func request_move(entity: Node, target_world_pos: Vector3) -> bool:
 		return false
 
 	var pathfinding = get_node_or_null("/root/PathfindingSystem")
-	if pathfinding == null:
-		# Fallback: direct path if PathfindingSystem not available
-		var path: Array[Vector3] = _generate_direct_fallback(entity_3d.global_position, target_world_pos)
-		_apply_path(entity, path)
-		return true
+	var path: Array[Vector3] = []
 
-	var path: Array[Vector3] = pathfinding.generate_path(entity_3d, target_world_pos)
+	if pathfinding and pathfinding.has_method("generate_path"):
+		path = pathfinding.generate_path(entity_3d, target_world_pos)
+	else:
+		# Fallback: pure great-circle
+		path = _generate_direct_fallback(entity_3d.global_position, target_world_pos)
+
 	if path.is_empty():
 		return false
 
 	_apply_path(entity, path)
 	return true
 
+
 func _apply_path(entity: Node, path: Array[Vector3]) -> void:
 	entity.set_meta("current_path", path)
 	entity.set_meta("current_path_index", 0)
+	_current_visualized_entity = entity
 
 	var globe = entity.get_parent()
 	if globe:
 		_show_path_visualization(globe, path)
+
 
 func _generate_direct_fallback(start: Vector3, end: Vector3) -> Array[Vector3]:
 	if start.is_equal_approx(end):
@@ -59,28 +65,39 @@ func _generate_direct_fallback(start: Vector3, end: Vector3) -> Array[Vector3]:
 	path[path.size() - 1] = end_dir * radius
 	return path
 
+
 func get_angular_speed(entity: Node) -> float:
 	var etype: String = _get_entity_type(entity)
 	return float(ENTITY_SPEEDS.get(etype, 1.5))
 
+
 func _get_entity_type(entity: Node) -> String:
 	if entity.get("data") != null and entity.data is Dictionary and entity.data.has("type"):
 		return str(entity.data["type"])
-	if entity is AirEntity: return "air"
-	if entity is GroundEntity: return "ground"
-	if entity is NavalEntity: return "naval"
+	if entity is AirEntity:
+		return "air"
+	if entity is GroundEntity:
+		return "ground"
+	if entity is NavalEntity:
+		return "naval"
 	return "ground"
+
 
 func clear_path(entity: Node) -> void:
 	if is_instance_valid(entity):
 		entity.set_meta("current_path", [])
 		entity.set_meta("current_path_index", 0)
+	if _current_visualized_entity == entity:
 		_hide_path_visualization()
+		_current_visualized_entity = null
+
 
 func has_active_path(entity: Node) -> bool:
-	if not is_instance_valid(entity): return false
+	if not is_instance_valid(entity):
+		return false
 	var raw = entity.get_meta("current_path", [])
 	return raw is Array and (raw as Array).size() > 0
+
 
 func update_movement(entity: Node, delta: float) -> void:
 	if not has_active_path(entity) or not is_instance_valid(entity):
@@ -121,7 +138,8 @@ func update_movement(entity: Node, delta: float) -> void:
 	var step: float = speed * delta
 
 	if angle <= step or angle < 0.001:
-		entity_3d.global_position = waypoint
+		# Snap to waypoint and advance
+		entity_3d.global_position = waypoint.normalized() * current_pos.length()
 		index += 1
 		entity.set_meta("current_path_index", index)
 
@@ -137,7 +155,7 @@ func update_movement(entity: Node, delta: float) -> void:
 		var new_dir: Vector3 = current_dir.slerp(target_dir, clampf(t, 0.0, 1.0))
 		entity_3d.global_position = new_dir * current_pos.length()
 
-	# Domain check
+	# Domain check – stop immediately if we left valid terrain
 	if LandSystem:
 		var on_land: bool = LandSystem.is_position_on_land(entity_3d.global_position)
 		var valid: bool = true
@@ -156,6 +174,7 @@ func update_movement(entity: Node, delta: float) -> void:
 	if "last_valid_pos" in entity:
 		entity.last_valid_pos = entity_3d.global_position
 
+
 func _show_path_visualization(globe: Node, path: Array) -> void:
 	_hide_path_visualization()
 	if path.size() < 2 or not globe:
@@ -172,11 +191,11 @@ func _show_path_visualization(globe: Node, path: Array) -> void:
 	material.emission = Color(0.3, 0.65, 1.0)
 	material.emission_energy_multiplier = 4.0
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(0.5, 0.8, 1.0, 0.8)
+	material.albedo_color = Color(0.5, 0.8, 1.0, 0.85)
 	material.render_priority = 50
 
 	var lift: float = 5.0
-	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, material)
+immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, material)
 	for pos in path:
 		if pos is Vector3:
 			var lifted: Vector3 = pos.normalized() * (pos.length() + lift)
@@ -187,7 +206,8 @@ func _show_path_visualization(globe: Node, path: Array) -> void:
 	globe.add_child(mesh_instance)
 	_path_visualizer = mesh_instance
 
+
 func _hide_path_visualization() -> void:
 	if _path_visualizer and is_instance_valid(_path_visualizer):
 		_path_visualizer.queue_free()
-		_path_visualizer = null
+	_path_visualizer = null
