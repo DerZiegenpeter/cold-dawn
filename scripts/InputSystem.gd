@@ -30,7 +30,7 @@ func _handle_mouse_button(event: InputEventMouseButton) -> void:
 
 func _handle_mouse_drag(event: InputEventMouseMotion) -> void:
 	var delta: Vector2 = event.position - last_mouse_pos
-	var sens := camera_system.sensitivity * clampf(camera_system.distance / 1100.0, 0.25, 1.0)
+	var sens: float = camera_system.sensitivity * clampf(camera_system.distance / 1100.0, 0.25, 1.0)
 	camera_system.add_yaw(delta.x * sens)
 	camera_system.add_pitch(delta.y * sens)
 	last_mouse_pos = event.position

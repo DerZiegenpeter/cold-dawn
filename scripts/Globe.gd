@@ -34,6 +34,40 @@ func get_state_polygons() -> Dictionary:
 func get_state_centers() -> Dictionary:
 	return state_centers
 
+func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
+	var radius: float = earth_radius * 1.002
+	var center: Vector3 = global_position
+
+	var oc: Vector3 = from - center
+	var a: float = dir.dot(dir)
+	var b: float = 2.0 * oc.dot(dir)
+	var c: float = oc.dot(oc) - radius * radius
+
+	var discriminant: float = b * b - 4 * a * c
+	if discriminant < 0:
+		return Vector3.ZERO
+
+	var sqrt_disc: float = sqrt(discriminant)
+	var t1: float = (-b - sqrt_disc) / (2.0 * a)
+	var t2: float = (-b + sqrt_disc) / (2.0 * a)
+
+	# Prefer closest positive intersection (front side)
+	var t: float = -1.0
+	if t1 > 0.0001 and t2 > 0.0001:
+		t = min(t1, t2)
+	elif t1 > 0.0001:
+		t = t1
+	elif t2 > 0.0001:
+		t = t2
+
+	if t < 0:
+		return Vector3.ZERO
+
+	if t > 5000:
+		return Vector3.ZERO
+
+	return center + dir * t
+
 func show_click_ring(world_pos: Vector3) -> void:
 	var ring := MeshInstance3D.new()
 	ring.name = "ClickRing"
@@ -49,30 +83,28 @@ func show_click_ring(world_pos: Vector3) -> void:
 	material.albedo_color = Color(0.6, 0.85, 1.0, 0.85)
 	material.render_priority = 50
 
-	var normal := world_pos.normalized()
-	var radius := 12.0
-	var segments := 64
-	var lift := 3.5
+	var normal: Vector3 = world_pos.normalized()
+	var radius: float = 12.0
+	var segments: int = 64
+	var lift: float = 3.5
 
-	# Create two perpendicular vectors in the tangent plane
-	var arbitrary := Vector3(0, 1, 0)
+	var arbitrary: Vector3 = Vector3(0, 1, 0)
 	if abs(normal.dot(arbitrary)) > 0.99:
 		arbitrary = Vector3(1, 0, 0)
-	var tangent1 := normal.cross(arbitrary).normalized()
-	var tangent2 := normal.cross(tangent1).normalized()
+	var tangent1: Vector3 = normal.cross(arbitrary).normalized()
+	var tangent2: Vector3 = normal.cross(tangent1).normalized()
 
 	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, material)
 	for i in range(segments + 1):
-		var angle := float(i) / segments * TAU
-		var offset := tangent1 * cos(angle) * radius + tangent2 * sin(angle) * radius
-		var pos := (normal * (world_pos.length() + lift)) + offset
+		var angle: float = float(i) / segments * TAU
+		var offset: Vector3 = tangent1 * cos(angle) * radius + tangent2 * sin(angle) * radius
+		var pos: Vector3 = (normal * (world_pos.length() + lift)) + offset
 		immediate_mesh.surface_add_vertex(pos)
 	immediate_mesh.surface_end()
 
 	ring.mesh = immediate_mesh
 	add_child(ring)
 
-	# Animate grow + fade (high quality feel)
 	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(ring, "scale", Vector3(2.5, 2.5, 2.5), 0.9).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
