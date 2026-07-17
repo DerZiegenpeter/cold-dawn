@@ -13,7 +13,7 @@ const ENTITY_SPEEDS := {
 }
 
 func get_angular_speed(entity: Node) -> float:
-	var etype := _get_entity_type(entity)
+	var etype: String = _get_entity_type(entity)
 	return float(ENTITY_SPEEDS.get(etype, 1.5))
 
 func _get_entity_type(entity: Node) -> String:
@@ -38,6 +38,10 @@ func has_active_path(entity: Node) -> bool:
 func update_movement(entity: Node, delta: float) -> void:
 	if not has_active_path(entity) or not is_instance_valid(entity): return
 
+	var entity_3d: Node3D = entity as Node3D
+	if entity_3d == null:
+		return
+
 	var raw_path = entity.get_meta("current_path", [])
 	if not (raw_path is Array):
 		clear_path(entity)
@@ -46,10 +50,10 @@ func update_movement(entity: Node, delta: float) -> void:
 	var path: Array = raw_path as Array
 	var index: int = entity.get_meta("current_path_index", 0)
 
-	var speed := get_angular_speed(entity)
-	var etype := _get_entity_type(entity)
-	var requires_land := etype == "ground"
-	var requires_water := etype == "naval"
+	var speed: float = get_angular_speed(entity)
+	var etype: String = _get_entity_type(entity)
+	var requires_land: bool = etype == "ground"
+	var requires_water: bool = etype == "naval"
 
 	if path.size() == 0 or index >= path.size():
 		clear_path(entity)
@@ -61,52 +65,52 @@ func update_movement(entity: Node, delta: float) -> void:
 		return
 	var waypoint: Vector3 = waypoint_variant
 
-	var current_pos := entity.global_position
-	var current_dir := current_pos.normalized()
-	var target_dir := waypoint.normalized()
-	var angle := current_dir.angle_to(target_dir)
+	var current_pos: Vector3 = entity_3d.global_position
+	var current_dir: Vector3 = current_pos.normalized()
+	var target_dir: Vector3 = waypoint.normalized()
+	var angle: float = current_dir.angle_to(target_dir)
 
-	var step := speed * delta
+	var step: float = speed * delta
 
 	if angle <= step or angle < 0.001:
-		entity.global_position = waypoint
+		entity_3d.global_position = waypoint
 		index += 1
 		entity.set_meta("current_path_index", index)
 
 		if index >= path.size():
 			clear_path(entity)
 			if entity.has_method("_orient_to_surface"): entity._orient_to_surface()
-			if "last_valid_pos" in entity: entity.last_valid_pos = entity.global_position
+			if "last_valid_pos" in entity: entity.last_valid_pos = entity_3d.global_position
 			return
 	else:
-		var t := step / angle if angle > 0.001 else 1.0
-		var new_dir := current_dir.slerp(target_dir, clampf(t, 0.0, 1.0))
-		entity.global_position = new_dir * current_pos.length()
+		var t: float = step / angle if angle > 0.001 else 1.0
+		var new_dir: Vector3 = current_dir.slerp(target_dir, clampf(t, 0.0, 1.0))
+		entity_3d.global_position = new_dir * current_pos.length()
 
 	# Domain enforcement
 	if LandSystem:
-		var on_land := LandSystem.is_position_on_land(entity.global_position)
-		var valid := true
+		var on_land: bool = LandSystem.is_position_on_land(entity_3d.global_position)
+		var valid: bool = true
 		if requires_land and not on_land: valid = false
 		elif requires_water and on_land: valid = false
 		if not valid:
 			if "last_valid_pos" in entity and entity.last_valid_pos != Vector3.ZERO:
-				entity.global_position = entity.last_valid_pos
+				entity_3d.global_position = entity.last_valid_pos
 			clear_path(entity)
 			return
 
 	if entity.has_method("_orient_to_surface"): entity._orient_to_surface()
-	if "last_valid_pos" in entity: entity.last_valid_pos = entity.global_position
+	if "last_valid_pos" in entity: entity.last_valid_pos = entity_3d.global_position
 
 func _show_path_visualization(globe: Node, path: Array) -> void:
 	_hide_path_visualization()
 	if path.size() < 2 or not globe: return
 
-	var mesh_instance := MeshInstance3D.new()
+	var mesh_instance: MeshInstance3D = MeshInstance3D.new()
 	mesh_instance.name = "PathVisualizer"
 
-	var immediate_mesh := ImmediateMesh.new()
-	var material := StandardMaterial3D.new()
+	var immediate_mesh: ImmediateMesh = ImmediateMesh.new()
+	var material: StandardMaterial3D = StandardMaterial3D.new()
 
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.emission_enabled = true
@@ -116,11 +120,11 @@ func _show_path_visualization(globe: Node, path: Array) -> void:
 	material.albedo_color = Color(0.5, 0.8, 1.0, 0.75)
 	material.render_priority = 45
 
-	var lift := 4.0
+	var lift: float = 4.0
 	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, material)
 	for pos in path:
 		if pos is Vector3:
-			var lifted := pos.normalized() * (pos.length() + lift)
+			var lifted: Vector3 = pos.normalized() * (pos.length() + lift)
 			immediate_mesh.surface_add_vertex(lifted)
 	immediate_mesh.surface_end()
 
