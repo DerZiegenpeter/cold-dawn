@@ -16,10 +16,8 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 
 [autoload]
 
-CameraSystem="*res://scripts/CameraSystem.gd"
-InputSystem="*res://scripts/InputSystem.gd"
-CommandSystem="*res://scripts/CommandSystem.gd"
 PathfindingSystem="*res://scripts/PathfindingSystem.gd"
+CommandSystem="*res://scripts/CommandSystem.gd"
 MovementSystem="*res://scripts/MovementSystem.gd"
 UnitManager="*res://scripts/UnitManager.gd"
 LandSystem="*res://scripts/LandSystem.gd"
