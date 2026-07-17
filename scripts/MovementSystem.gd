@@ -1,7 +1,8 @@
 extends Node
 
 ## MovementSystem
-## Path-Generierung + Bewegung ausführen
+## Clean modern movement: receives a target, asks PathfindingSystem for a path,
+## shows a nice path, then moves the entity along it.
 
 var _path_visualizer: MeshInstance3D = null
 
@@ -10,6 +11,53 @@ const ENTITY_SPEEDS := {
 	"air": 2.8,
 	"naval": 1.6
 }
+
+func request_move(entity: Node, target_world_pos: Vector3) -> bool:
+	if not is_instance_valid(entity):
+		return false
+
+	var entity_3d := entity as Node3D
+	if entity_3d == null:
+		return false
+
+	var pathfinding = get_node_or_null("/root/PathfindingSystem")
+	if pathfinding == null:
+		# Fallback: direct path if PathfindingSystem not available
+		var path: Array[Vector3] = _generate_direct_fallback(entity_3d.global_position, target_world_pos)
+		_apply_path(entity, path)
+		return true
+
+	var path: Array[Vector3] = pathfinding.generate_path(entity_3d, target_world_pos)
+	if path.is_empty():
+		return false
+
+	_apply_path(entity, path)
+	return true
+
+func _apply_path(entity: Node, path: Array[Vector3]) -> void:
+	entity.set_meta("current_path", path)
+	entity.set_meta("current_path_index", 0)
+
+	var globe = entity.get_parent()
+	if globe:
+		_show_path_visualization(globe, path)
+
+func _generate_direct_fallback(start: Vector3, end: Vector3) -> Array[Vector3]:
+	if start.is_equal_approx(end):
+		return [end]
+	var start_dir: Vector3 = start.normalized()
+	var end_dir: Vector3 = end.normalized()
+	var angle: float = start_dir.angle_to(end_dir)
+	var segments: int = maxi(8, int(ceil(angle / deg_to_rad(5.0))))
+	segments = mini(segments, 40)
+	var path: Array[Vector3] = []
+	var radius: float = start.length()
+	for i in range(segments + 1):
+		var t: float = float(i) / float(segments)
+		var dir: Vector3 = start_dir.slerp(end_dir, t)
+		path.append(dir * radius)
+	path[path.size() - 1] = end_dir * radius
+	return path
 
 func get_angular_speed(entity: Node) -> float:
 	var etype: String = _get_entity_type(entity)
@@ -23,67 +71,6 @@ func _get_entity_type(entity: Node) -> String:
 	if entity is NavalEntity: return "naval"
 	return "ground"
 
-func request_move(entity: Node, target_world_pos: Vector3) -> bool:
-	if not is_instance_valid(entity):
-		return false
-
-	var entity_3d: Node3D = entity as Node3D
-	if entity_3d == null:
-		return false
-
-	var etype: String = _get_entity_type(entity)
-	var is_naval: bool = etype == "naval"
-	var is_air: bool = etype == "air"
-
-	# Domain check at target
-	var valid: bool = true
-	if is_naval:
-		if LandSystem and LandSystem.is_position_on_land(target_world_pos):
-			valid = false
-	elif not is_air:
-		if LandSystem and not LandSystem.is_position_on_land(target_world_pos):
-			valid = false
-
-	if not valid:
-		print("[Movement] Ziel nicht erreichbar für ", etype)
-		return false
-
-	# Generate path
-	var path: Array[Vector3] = []
-	if PathfindingSystem and PathfindingSystem.has_method("generate_path"):
-		path = PathfindingSystem.generate_path(entity_3d, target_world_pos)
-	else:
-		# Fallback: direct path
-		path = _generate_direct_path(entity_3d.global_position, target_world_pos)
-
-	if path.is_empty():
-		return false
-
-	entity.set_meta("current_path", path)
-	entity.set_meta("current_path_index", 0)
-
-	var globe: Node = entity.get_parent()
-	_show_path_visualization(globe, path)
-	return true
-
-func _generate_direct_path(start: Vector3, end: Vector3) -> Array[Vector3]:
-	if start.is_equal_approx(end):
-		return [end]
-	var start_dir: Vector3 = start.normalized()
-	var end_dir: Vector3 = end.normalized()
-	var angle: float = start_dir.angle_to(end_dir)
-	var segments: int = maxi(8, int(ceil(angle / deg_to_rad(4.5))))
-	segments = mini(segments, 48)
-
-	var path: Array[Vector3] = []
-	var radius: float = start.length()
-	for i in range(segments + 1):
-		var t: float = float(i) / float(segments)
-		var dir: Vector3 = start_dir.slerp(end_dir, t)
-		path.append(dir * radius)
-	path[path.size() - 1] = end_dir * radius
-	return path
-
 func clear_path(entity: Node) -> void:
 	if is_instance_valid(entity):
 		entity.set_meta("current_path", [])
@@ -96,7 +83,8 @@ func has_active_path(entity: Node) -> bool:
 	return raw is Array and (raw as Array).size() > 0
 
 func update_movement(entity: Node, delta: float) -> void:
-	if not has_active_path(entity) or not is_instance_valid(entity): return
+	if not has_active_path(entity) or not is_instance_valid(entity):
+		return
 
 	var entity_3d: Node3D = entity as Node3D
 	if entity_3d == null:
@@ -139,32 +127,39 @@ func update_movement(entity: Node, delta: float) -> void:
 
 		if index >= path.size():
 			clear_path(entity)
-			if entity.has_method("_orient_to_surface"): entity._orient_to_surface()
-			if "last_valid_pos" in entity: entity.last_valid_pos = entity_3d.global_position
+			if entity.has_method("_orient_to_surface"):
+				entity._orient_to_surface()
+			if "last_valid_pos" in entity:
+				entity.last_valid_pos = entity_3d.global_position
 			return
 	else:
 		var t: float = step / angle if angle > 0.001 else 1.0
 		var new_dir: Vector3 = current_dir.slerp(target_dir, clampf(t, 0.0, 1.0))
 		entity_3d.global_position = new_dir * current_pos.length()
 
-	# Domain enforcement
+	# Domain check
 	if LandSystem:
 		var on_land: bool = LandSystem.is_position_on_land(entity_3d.global_position)
 		var valid: bool = true
-		if requires_land and not on_land: valid = false
-		elif requires_water and on_land: valid = false
+		if requires_land and not on_land:
+			valid = false
+		elif requires_water and on_land:
+			valid = false
 		if not valid:
 			if "last_valid_pos" in entity and entity.last_valid_pos != Vector3.ZERO:
 				entity_3d.global_position = entity.last_valid_pos
 			clear_path(entity)
 			return
 
-	if entity.has_method("_orient_to_surface"): entity._orient_to_surface()
-	if "last_valid_pos" in entity: entity.last_valid_pos = entity_3d.global_position
+	if entity.has_method("_orient_to_surface"):
+		entity._orient_to_surface()
+	if "last_valid_pos" in entity:
+		entity.last_valid_pos = entity_3d.global_position
 
 func _show_path_visualization(globe: Node, path: Array) -> void:
 	_hide_path_visualization()
-	if path.size() < 2 or not globe: return
+	if path.size() < 2 or not globe:
+		return
 
 	var mesh_instance: MeshInstance3D = MeshInstance3D.new()
 	mesh_instance.name = "PathVisualizer"
@@ -174,13 +169,13 @@ func _show_path_visualization(globe: Node, path: Array) -> void:
 
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.emission_enabled = true
-	material.emission = Color(0.3, 0.6, 1.0)
-	material.emission_energy_multiplier = 3.5
+	material.emission = Color(0.3, 0.65, 1.0)
+	material.emission_energy_multiplier = 4.0
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(0.5, 0.8, 1.0, 0.75)
-	material.render_priority = 45
+	material.albedo_color = Color(0.5, 0.8, 1.0, 0.8)
+	material.render_priority = 50
 
-	var lift: float = 4.0
+	var lift: float = 5.0
 	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, material)
 	for pos in path:
 		if pos is Vector3:

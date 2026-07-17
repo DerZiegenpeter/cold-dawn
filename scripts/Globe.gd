@@ -34,6 +34,7 @@ func get_state_polygons() -> Dictionary:
 func get_state_centers() -> Dictionary:
 	return state_centers
 
+# Robust sphere raycast - always returns the closest front-side hit
 func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	var radius: float = earth_radius * 1.002
 	var center: Vector3 = global_position
@@ -43,27 +44,27 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	var b: float = 2.0 * oc.dot(dir)
 	var c: float = oc.dot(oc) - radius * radius
 
-	var discriminant: float = b * b - 4 * a * c
-	if discriminant < 0:
+	var discriminant: float = b * b - 4.0 * a * c
+	if discriminant < 0.0:
 		return Vector3.ZERO
 
 	var sqrt_disc: float = sqrt(discriminant)
-	var t1: float = (-b - sqrt_disc) / (2.0 * a)
-	var t2: float = (-b + sqrt_disc) / (2.0 * a)
+	var inv_2a: float = 1.0 / (2.0 * a)
+	var t0: float = (-b - sqrt_disc) * inv_2a
+	var t1: float = (-b + sqrt_disc) * inv_2a
 
-	# Prefer closest positive intersection (front side)
+	# When camera is outside the sphere the smaller positive t is always the front hit
 	var t: float = -1.0
-	if t1 > 0.0001 and t2 > 0.0001:
-		t = min(t1, t2)
-	elif t1 > 0.0001:
+	if t0 > 0.001:
+		t = t0
+	if t1 > 0.001 and (t < 0.0 or t1 < t):
 		t = t1
-	elif t2 > 0.0001:
-		t = t2
 
-	if t < 0:
+	if t < 0.0:
 		return Vector3.ZERO
 
-	if t > 5000:
+	# Reject absurdly far hits (safety against numerical issues)
+	if t > 8000.0:
 		return Vector3.ZERO
 
 	return center + dir * t
@@ -96,7 +97,7 @@ func show_click_ring(world_pos: Vector3) -> void:
 
 	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, material)
 	for i in range(segments + 1):
-		var angle: float = float(i) / segments * TAU
+		var angle: float = float(i) / float(segments) * TAU
 		var offset: Vector3 = tangent1 * cos(angle) * radius + tangent2 * sin(angle) * radius
 		var pos: Vector3 = (normal * (world_pos.length() + lift)) + offset
 		immediate_mesh.surface_add_vertex(pos)
