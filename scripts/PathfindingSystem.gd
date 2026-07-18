@@ -157,6 +157,11 @@ func _find_detour_path(start: Vector3, target: Vector3, etype: String) -> Array[
 	if best_path.is_empty():
 		best_path = _find_two_waypoint_detour(start, target, etype, axis, radius)
 
+	# Ultimate safety net: never return a path that would immediately fail domain checks
+	if not best_path.is_empty() and not _is_path_valid(best_path, etype):
+		print("[Pathfinding] Detour path invalid after construction - using direct fallback")
+		return _generate_direct_path(start, target)
+
 	return best_path
 
 
