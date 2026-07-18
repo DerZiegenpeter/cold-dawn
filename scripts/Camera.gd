@@ -187,12 +187,15 @@ func _handle_right_click() -> void:
 		var selected = UnitManager.selected_entity
 		var allow_move := true
 
+		# Slightly lift outward so LandSystem check is more reliable
+		var lifted_hit = hit_pos.normalized() * (hit_pos.length() + 3.0)
+
 		if selected is GroundEntity:
-			if not (LandSystem and LandSystem.is_position_on_land(hit_pos)):
+			if not (LandSystem and LandSystem.is_position_on_land(lifted_hit)):
 				allow_move = false
 				print("[Movement] Nur auf Land/States erlaubt!")
 		elif selected is NavalEntity:
-			if LandSystem and LandSystem.is_position_on_land(hit_pos):
+			if LandSystem and LandSystem.is_position_on_land(lifted_hit):
 				allow_move = false
 				print("[Movement] Naval kann nicht auf Land!")
 
