@@ -267,7 +267,7 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	# can legitimately have dot ≈ -0.7 … -0.95
 	var to_cam: Vector3 = (from - center).normalized()
 	var to_hit: Vector3 = (hit - center).normalized()
-	if to_hit.dot(to_cam) < -0.85:
+	if to_hit.dot(to_cam) < -0.95:
 		print("[Camera][Raycast] Rejected back-side hit (dot = ", to_hit.dot(to_cam), ")")
 		return Vector3.ZERO
 
