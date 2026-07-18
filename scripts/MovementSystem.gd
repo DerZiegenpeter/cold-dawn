@@ -183,3 +183,41 @@ func update_movement(entity: Node, delta: float) -> void:
 	if "last_valid_pos" in entity:
 		entity.last_valid_pos = entity_3d.global_position
 	print("[Movement] Moving ", etype, " step, remaining waypoints: ", path.size() - index)
+
+
+func _show_path_visualization(globe: Node, path: Array) -> void:
+	_hide_path_visualization()
+	if path.size() < 2 or not globe:
+		return
+
+	var mesh_instance: MeshInstance3D = MeshInstance3D.new()
+	mesh_instance.name = "PathVisualizer"
+
+	var immediate_mesh: ImmediateMesh = ImmediateMesh.new()
+	var material: StandardMaterial3D = StandardMaterial3D.new()
+
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.emission_enabled = true
+	material.emission = Color(0.3, 0.65, 1.0)
+	material.emission_energy_multiplier = 4.0
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = Color(0.5, 0.8, 1.0, 0.85)
+	material.render_priority = 50
+
+	var lift: float = 5.0
+	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, material)
+	for pos in path:
+		if pos is Vector3:
+			var lifted: Vector3 = pos.normalized() * (pos.length() + lift)
+			immediate_mesh.surface_add_vertex(lifted)
+	immediate_mesh.surface_end()
+
+	mesh_instance.mesh = immediate_mesh
+	globe.add_child(mesh_instance)
+	_path_visualizer = mesh_instance
+
+
+func _hide_path_visualization() -> void:
+	if _path_visualizer and is_instance_valid(_path_visualizer):
+		_path_visualizer.queue_free()
+	_path_visualizer = null
