@@ -82,9 +82,9 @@ func _update_position() -> void:
 	look_at(target.global_position, Vector3.UP)
 
 func _fade_coastlines() -> void:
-	var coast := globe.get_node_or_null("Coastlines")
+	var coast: Node = globe.get_node_or_null("Coastlines")
 	if not coast: return
-	var mat := coast.material_override as StandardMaterial3D
+	var mat: StandardMaterial3D = coast.material_override as StandardMaterial3D
 	if not mat: return
 
 	var alpha := 1.0
@@ -123,9 +123,9 @@ func _fade_all_states() -> void:
 			mat.albedo_color = col
 
 func _fade_cities() -> void:
-	var cities_node := globe.get_node_or_null("Cities")
+	var cities_node: Node = globe.get_node_or_null("Cities")
 	if not cities_node: return
-	var mat := cities_node.material_override as StandardMaterial3D
+	var mat: StandardMaterial3D = cities_node.material_override as StandardMaterial3D
 	if not mat: return
 
 	# Same thresholds as states so they appear/disappear together

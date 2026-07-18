@@ -135,68 +135,76 @@ func load_state_data() -> void:
 
 func create_states() -> void:
 	var data := load_geojson("res://data/geojson/states.geojson")
-	if data.is_empty() or data.get("type") != "FeatureCollection": return
+	if data.is_empty() or data.get("type") != "FeatureCollection":
+		return
 
-	var created := 0
-	var index := 0
+	var created: int = 0
+	var index: int = 0
 
 	for feature in data.get("features", []):
 		index += 1
-		var state_id := index
+		var state_id: int = index
 
-	var vertices := PackedVector3Array()
+	var vertices: PackedVector3Array = PackedVector3Array()
 		_add_geometry(feature.get("geometry", {}), vertices)
 
-	if feature.get("geometry", {}).get("type") in ["Polygon", "MultiPolygon"]:
-		var coords = feature["geometry"]["coordinates"]
-		var outer := []
-		if feature["geometry"]["type"] == "Polygon" and coords.size() > 0:
+	var geometry_type: String = ""
+	var geometry_dict: Dictionary = feature.get("geometry", {})
+	if geometry_dict.has("type"):
+		geometry_type = geometry_dict.get("type", "")
+
+	if geometry_type in ["Polygon", "MultiPolygon"]:
+		var coords: Array = geometry_dict.get("coordinates", [])
+		var outer: Array = []
+		if geometry_type == "Polygon" and coords.size() > 0:
 			outer = coords[0]
-		elif feature["geometry"]["type"] == "MultiPolygon" and coords.size() > 0:
-			outer = coords[0][0] if coords[0].size() > 0 else []
+		elif geometry_type == "MultiPolygon" and coords.size() > 0:
+			if coords[0].size() > 0:
+				outer = coords[0][0]
 		if outer.size() > 0:
 			state_polygons[state_id] = outer
 
-		if vertices.is_empty(): continue
+	if vertices.is_empty():
+		continue
 
-		var center := Vector3.ZERO
-		for v in vertices:
-			center += v
-		if vertices.size() > 0:
-			center /= float(vertices.size())
-			center = center.normalized() * (earth_radius * SURFACE_LIFT)
+	var center: Vector3 = Vector3.ZERO
+	for v in vertices:
+		center += v
+	if vertices.size() > 0:
+		center /= float(vertices.size())
+		center = center.normalized() * (earth_radius * SURFACE_LIFT)
 
-		state_centers[state_id] = center
+	state_centers[state_id] = center
 
-		var local := PackedVector3Array()
-		local.resize(vertices.size())
-		for i in range(vertices.size()):
-			local[i] = vertices[i] - center
+	var local: PackedVector3Array = PackedVector3Array()
+	local.resize(vertices.size())
+	for i in range(vertices.size()):
+		local[i] = vertices[i] - center
 
-		var mesh := ArrayMesh.new()
-		var arrays := []
-		arrays.resize(Mesh.ARRAY_MAX)
-		arrays[Mesh.ARRAY_VERTEX] = local
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
+	var mesh: ArrayMesh = ArrayMesh.new()
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = local
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
 
-		var mi := MeshInstance3D.new()
-		mi.name = "State_" + str(state_id)
-		mi.mesh = mesh
-		mi.position = center
+	var mi: MeshInstance3D = MeshInstance3D.new()
+	mi.name = "State_" + str(state_id)
+	mi.mesh = mesh
+	mi.position = center
 
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = state_color
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.emission_enabled = true
-		mat.emission = state_color
-		mat.emission_energy_multiplier = state_emission_energy
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.render_priority = 8
-		mat.albedo_color.a = 0.0
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
+	mat.albedo_color = state_color
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.emission_enabled = true
+	mat.emission = state_color
+	mat.emission_energy_multiplier = state_emission_energy
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.render_priority = 8
+	mat.albedo_color.a = 0.0
 
-		mi.material_override = mat
-		add_child(mi)
-		created += 1
+	mi.material_override = mat
+	add_child(mi)
+	created += 1
 
 	print("States erstellt: ", created)
 
