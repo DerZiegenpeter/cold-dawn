@@ -77,7 +77,7 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 
 	# If the chosen hit is strongly back-facing, try swapping to the other intersection
 	if to_hit.dot(to_cam) < -0.6 and t0 > 0.001 and t1 > 0.001:
-		var other_t = (t == t0) ? t1 : t0
+		var other_t = t1 if (t == t0) else t0
 		var other_hit = center + dir * other_t
 		var other_to_hit = (other_hit - center).normalized()
 		if other_to_hit.dot(to_cam) > to_hit.dot(to_cam):
