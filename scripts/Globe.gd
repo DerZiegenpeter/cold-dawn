@@ -144,18 +144,18 @@ func create_states() -> void:
 		index += 1
 		var state_id := index
 
-		var vertices := PackedVector3Array()
+	var vertices := PackedVector3Array()
 		_add_geometry(feature.get("geometry", {}), vertices)
 
-		if feature.get("geometry", {}).get("type") in ["Polygon", "MultiPolygon"]:
-			var coords = feature["geometry"]["coordinates"]
-			var outer := []
-			if feature["geometry"]["type"] == "Polygon" and coords.size() > 0:
-				outer = coords[0]
-			elif feature["geometry"]["type"] == "MultiPolygon" and coords.size() > 0:
-				outer = coords[0][0] if coords[0].size() > 0 else []
-			if outer.size() > 0:
-				state_polygons[state_id] = outer
+	if feature.get("geometry", {}).get("type") in ["Polygon", "MultiPolygon"]:
+		var coords = feature["geometry"]["coordinates"]
+		var outer := []
+		if feature["geometry"]["type"] == "Polygon" and coords.size() > 0:
+			outer = coords[0]
+		elif feature["geometry"]["type"] == "MultiPolygon" and coords.size() > 0:
+			outer = coords[0][0] if coords[0].size() > 0 else []
+		if outer.size() > 0:
+			state_polygons[state_id] = outer
 
 		if vertices.is_empty(): continue
 
