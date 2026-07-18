@@ -262,10 +262,12 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 
 	var hit: Vector3 = center + dir * t
 
-	# Final front-side guard: reject if the hit is on the opposite side of the globe
+	# Final front-side guard: reject only true back-side hits (very negative dot)
+	# We allow quite negative values because clicks on the sides of the visible globe
+	# can legitimately have dot ≈ -0.7 … -0.95
 	var to_cam: Vector3 = (from - center).normalized()
 	var to_hit: Vector3 = (hit - center).normalized()
-	if to_hit.dot(to_cam) < -0.25:   # relaxed for testing
+	if to_hit.dot(to_cam) < -0.85:
 		print("[Camera][Raycast] Rejected back-side hit (dot = ", to_hit.dot(to_cam), ")")
 		return Vector3.ZERO
 
