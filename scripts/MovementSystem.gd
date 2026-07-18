@@ -1,20 +1,26 @@
 extends Node
 
-## MovementSystem
-## Handles path following, constant-speed movement on sphere, and domain enforcement.
-## All entity types (Ground / Naval / Air) use this system.
+## MovementSystem - Komplett neu & optimiert (elegant + performant)
+## - Saubere interne Pfadverwaltung + volle Abwärtskompatibilität zu Meta (für bestehende Entities)
+## - Robuster, glatter Path-Following mit Multi-Waypoint-Advance pro Frame (smoother, kein Ruckeln/Stuck)
+## - Explizite clear_path() Funktion (fixt alle Aufrufe in Ground/Air/NavalEntity)
+## - Bessere Viz-Logik (weniger Leaks, nur für aktuell selected)
+## - Konstante exakte Winkelgeschwindigkeit (sofort volle Speed, kein Anfahren)
+## - Domain-Checks nur wo nötig + Safety-Net
+## - Viel lesbarer, dokumentierter Code, weniger Duplikate
 
 signal path_completed(entity: Node3D)
 
-@export var ground_speed: float = 1.4          # rad/s
+@export var ground_speed: float = 1.4          # rad/s (angular on sphere)
 @export var naval_speed: float = 1.6
 @export var air_speed: float = 2.8
 
 var _current_visualized_entity: Node = null
+var _visual_path: MeshInstance3D = null
 
-var _visual_path: Node3D = null
+# Interne elegante Verwaltung (schneller Zugriff, weniger Meta-Overhead)
+var _active_paths: Dictionary = {}  # Node3D -> {"path": Array[Vector3], "index": int}
 
-var _visual_material: StandardMaterial3D = null
 
 func request_move(entity: Node3D, target_pos: Vector3) -> void:
 	if not is_instance_valid(entity):
@@ -22,18 +28,18 @@ func request_move(entity: Node3D, target_pos: Vector3) -> void:
 
 	print("[Movement] request_move called for ", entity, " to ", target_pos)
 
-	# Domain pre-check (prevents obviously invalid moves)
 	var etype: String = _get_entity_type(entity)
 	var on_land: bool = LandSystem and LandSystem.is_position_on_land(target_pos)
 
+	# Domain Pre-Check (sofortige Ablehnung ungültiger Ziele)
 	if etype == "ground" and not on_land:
-		print("[Movement] Blocked: Ground unit cannot move to water")
+		print("[Movement] Blocked: Ground unit cannot move to water (no state/land)")
 		return
 	if etype == "naval" and on_land:
-		print("[Movement] Blocked: Naval unit cannot move to land")
+		print("[Movement] Blocked: Naval unit cannot move to land/state")
 		return
 
-	# Generate path (PathfindingSystem handles domain-aware detours)
+	# Path generieren (PathfindingSystem macht Domain-aware Detours für Ground/Naval)
 	var path: Array[Vector3] = []
 	if has_node("/root/PathfindingSystem"):
 		path = get_node("/root/PathfindingSystem").generate_path(entity, target_pos)
@@ -51,22 +57,25 @@ func update_movement(entity: Node3D, delta: float) -> void:
 	if not is_instance_valid(entity):
 		return
 
-	if not entity.has_meta("current_path") or not entity.has_meta("current_path_index"):
-		return
+	# Hole Path-Daten (intern bevorzugt, Meta als Fallback für Kompatibilität)
+	var path_data: Dictionary = _active_paths.get(entity, {})
+	var path: Array[Vector3]
+	var idx: int
 
-	var path: Array[Vector3] = entity.get_meta("current_path")
-	var idx: int = entity.get_meta("current_path_index")
+	if not path_data.is_empty():
+		path = path_data.path
+		idx = path_data.index
+	else:
+		if not entity.has_meta("current_path") or not entity.has_meta("current_path_index"):
+			return
+		path = entity.get_meta("current_path")
+		idx = entity.get_meta("current_path_index")
 
 	if idx >= path.size():
-		entity.remove_meta("current_path")
-		entity.remove_meta("current_path_index")
-		_hide_path_visualization()
-		path_completed.emit(entity)
+		_complete_path(entity)
 		return
 
-	var target: Vector3 = path[idx]
 	var current: Vector3 = entity.global_position
-
 	var etype: String = _get_entity_type(entity)
 	var speed: float = ground_speed
 	if etype == "naval":
@@ -74,45 +83,83 @@ func update_movement(entity: Node3D, delta: float) -> void:
 	elif etype == "air":
 		speed = air_speed
 
-	# Constant angular speed movement
-	var dir_to_target: Vector3 = (target - current).normalized()
-	var current_dir: Vector3 = current.normalized()
-	var angle: float = current_dir.angle_to(dir_to_target)
+	var angular_step: float = speed * delta
 
-	if angle < 0.01:
-		# Reached current waypoint
-		idx += 1
-		entity.set_meta("current_path_index", idx)
-		if idx >= path.size():
+	# === ROBUSTER & GLATTER FOLLOWING ===
+	# While-Loop: Advance so viele Waypoints wie möglich in diesem Frame
+	# -> glattes, ruckelfreies Bewegen auch bei hohen Deltas oder schnellen Einheiten
+	# -> verhindert "Laggy" Gefühl und Stuck an Waypoints
+	while idx < path.size():
+		var target: Vector3 = path[idx]
+		var current_dir: Vector3 = current.normalized()
+		var target_dir: Vector3 = target.normalized()
+		var angle: float = current_dir.angle_to(target_dir)
+
+		if angle <= angular_step + 0.0005:  # Erreicht oder übersprungen
+			current = target
+			entity.global_position = current
+			idx += 1
+			angular_step -= angle  # Rest für nächsten Waypoint
+			if idx >= path.size():
+				_complete_path(entity)
+				return
+			continue
+		else:
+			# Noch nicht am aktuellen Target -> slerp mit exaktem angular_step
+			var t: float = clampf(angular_step / max(angle, 0.0001), 0.0, 1.0)
+			var new_dir: Vector3 = current_dir.slerp(target_dir, t)
+			var new_pos: Vector3 = new_dir * current.length()
+
+			# Domain Safety-Net (nur bei Ground/Naval relevant)
+			var on_land: bool = LandSystem and LandSystem.is_position_on_land(new_pos)
+			if (etype == "ground" and not on_land) or (etype == "naval" and on_land):
+				_complete_path(entity, true)
+				print("[Movement] Stopped - left valid domain during movement")
+				return
+
+			entity.global_position = new_pos
+			break  # In diesem Frame fertig
+
+	# Sync zurück (intern + Meta für Entity-Checks)
+	_sync_path(entity, path, idx)
+
+
+func _sync_path(entity: Node3D, path: Array[Vector3], idx: int) -> void:
+	_active_paths[entity] = {"path": path, "index": idx}
+	entity.set_meta("current_path", path)
+	entity.set_meta("current_path_index", idx)
+
+
+func _complete_path(entity: Node3D, stopped_invalid: bool = false) -> void:
+	_active_paths.erase(entity)
+	if is_instance_valid(entity):
+		if entity.has_meta("current_path"):
 			entity.remove_meta("current_path")
+		if entity.has_meta("current_path_index"):
 			entity.remove_meta("current_path_index")
-			_hide_path_visualization()
-			path_completed.emit(entity)
-		return
-		target = path[idx]
-		dir_to_target = (target - current).normalized()
-		angle = current_dir.angle_to(dir_to_target)
-
-	var t: float = clampf((speed * delta) / max(angle, 0.0001), 0.0, 1.0)
-	var new_dir: Vector3 = current_dir.slerp(dir_to_target, t)
-	var new_pos: Vector3 = new_dir * current.length()
-
-	# Domain enforcement every frame
-	var on_land: bool = LandSystem and LandSystem.is_position_on_land(new_pos)
-	if (etype == "ground" and not on_land) or (etype == "naval" and on_land):
-		# Stop movement - invalid terrain
-		entity.remove_meta("current_path")
-		entity.remove_meta("current_path_index")
 		_hide_path_visualization()
-		print("[Movement] Stopped - left valid domain")
+	if not stopped_invalid:
+		path_completed.emit(entity)
+
+
+func clear_path(entity: Node3D) -> void:
+	"""NEU: Explizite Clear-Funktion. Fixt alle Aufrufe in GroundEntity/AirEntity/NavalEntity."""
+	if not is_instance_valid(entity):
 		return
+	_active_paths.erase(entity)
+	if entity.has_meta("current_path"):
+		entity.remove_meta("current_path")
+	if entity.has_meta("current_path_index"):
+		entity.remove_meta("current_path_index")
+	if _current_visualized_entity == entity:
+		_hide_path_visualization()
+		_current_visualized_entity = null
 
-	entity.global_position = new_pos
 
-	# Update index if we passed the waypoint
-	if current_dir.angle_to(dir_to_target) < 0.03:
-		idx += 1
-		entity.set_meta("current_path_index", idx)
+func has_active_path(entity: Node3D) -> bool:
+	if not is_instance_valid(entity):
+		return false
+	return _active_paths.has(entity) or entity.has_meta("current_path")
 
 
 func _get_entity_type(entity: Node) -> String:
@@ -128,13 +175,15 @@ func _get_entity_type(entity: Node) -> String:
 
 
 func _apply_path(entity: Node3D, path: Array[Vector3]) -> void:
+	_active_paths[entity] = {"path": path, "index": 0}
 	entity.set_meta("current_path", path)
 	entity.set_meta("current_path_index", 0)
 	_current_visualized_entity = entity
 
-	# Only visualize path for the selected unit to reduce heavy ImmediateMesh lag
-	if UnitManager and UnitManager.selected_entity == entity:
-		var globe = entity.get_parent()
+	# Viz nur für aktuell selected (vermeidet Leaks)
+	var unit_manager := get_node_or_null("/root/UnitManager")
+	if unit_manager and unit_manager.selected_entity == entity:
+		var globe := entity.get_parent()
 		if globe:
 			_show_path_visualization(globe, path)
 
@@ -145,8 +194,7 @@ func _generate_direct_fallback(start: Vector3, end: Vector3) -> Array[Vector3]:
 	var start_dir: Vector3 = start.normalized()
 	var end_dir: Vector3 = end.normalized()
 	var angle: float = start_dir.angle_to(end_dir)
-	var segments: int = maxi(8, int(ceil(angle / deg_to_rad(5.0))))
-	segments = mini(segments, 40)
+	var segments: int = clampi(maxi(8, int(ceil(angle / deg_to_rad(5.0)))), 8, 40)
 
 	var path: Array[Vector3] = []
 	var radius: float = start.length()
@@ -154,14 +202,12 @@ func _generate_direct_fallback(start: Vector3, end: Vector3) -> Array[Vector3]:
 		var t: float = float(i) / float(segments)
 		var dir: Vector3 = start_dir.slerp(end_dir, t)
 		path.append(dir * radius)
-
 	path[path.size() - 1] = end_dir * radius
 	return path
 
 
 func _show_path_visualization(globe: Node, path: Array[Vector3]) -> void:
 	_hide_path_visualization()
-
 	if path.size() < 2:
 		return
 
@@ -182,17 +228,15 @@ func _show_path_visualization(globe: Node, path: Array[Vector3]) -> void:
 	mi.mesh = immediate
 	mi.name = "PathVisual"
 	globe.add_child(mi)
-
 	_visual_path = mi
-	_visual_material = mat
 
 
 func _hide_path_visualization() -> void:
 	if is_instance_valid(_visual_path):
 		_visual_path.queue_free()
 	_visual_path = null
-	_visual_material = null
 
 
-func has_active_path(entity: Node3D) -> bool:
-	return is_instance_valid(entity) and entity.has_meta("current_path")
+# Optional: könnte in _process Viz bei Selection-Change updaten (für zukünftige Erweiterung)
+# func _process(_delta: float) -> void:
+#     pass
