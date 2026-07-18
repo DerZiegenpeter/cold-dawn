@@ -55,7 +55,8 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	var t0: float = (-b - sqrt_disc) * inv_2a
 	var t1: float = (-b + sqrt_disc) * inv_2a
 
-	# When camera is outside the sphere the smaller positive t is always the front hit
+	# Prefer the smaller positive t, but if it leads to a very back-side hit,
+	# try the other one if it is more front-facing.
 	var t: float = -1.0
 	if t0 > 0.001:
 		t = t0
@@ -71,11 +72,20 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 
 	var hit: Vector3 = center + dir * t
 
-	# Extra front-side guard: reject only true back-side hits
-	# Allow quite negative dot values for clicks on the sides of the visible globe
 	var to_cam: Vector3 = (from - center).normalized()
 	var to_hit: Vector3 = (hit - center).normalized()
-	if to_hit.dot(to_cam) < -0.95:
+
+	# If the chosen hit is strongly back-facing, try swapping to the other intersection
+	if to_hit.dot(to_cam) < -0.6 and t0 > 0.001 and t1 > 0.001:
+		var other_t = (t == t0) ? t1 : t0
+		var other_hit = center + dir * other_t
+		var other_to_hit = (other_hit - center).normalized()
+		if other_to_hit.dot(to_cam) > to_hit.dot(to_cam):
+			hit = other_hit
+			to_hit = other_to_hit
+
+	# Final guard - reject only if still extremely back-side after possible swap
+	if to_hit.dot(to_cam) < -0.92:
 		print("[Globe][Raycast] Rejected back-side hit (dot = ", to_hit.dot(to_cam), ")")
 		return Vector3.ZERO
 
