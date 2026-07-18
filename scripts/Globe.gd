@@ -21,6 +21,7 @@ func _ready() -> void:
 	create_coastlines()
 	create_states()
 	create_cities()
+	_create_click_collider()          # Physics collider for reliable raycasting
 
 	LandSystem.initialize_from_globe(self)
 	UnitManager.initialize(self)
@@ -34,18 +35,27 @@ func get_state_polygons() -> Dictionary:
 func get_state_centers() -> Dictionary:
 	return state_centers
 
-# Final robust raycast - always prefers the closest visible (front) intersection
+# Preferred raycast using Physics (most reliable in Godot)
+# Falls back to improved mathematical solution if needed
 func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
+	# Try physics raycast first (most reliable front-side hit)
+	var space_state = get_world_3d().direct_space_state
+	if space_state:
+		var query = PhysicsRayQueryParameters3D.create(from, from + dir * 2000.0)
+		query.collision_mask = 2
+		var result = space_state.intersect_ray(query)
+		if result:
+			return result.position
+
+	# Fallback mathematical solution (improved)
 	var radius: float = earth_radius * 1.002
 	var center: Vector3 = global_position
-
 	var oc: Vector3 = from - center
 	var a: float = dir.dot(dir)
 	if a < 0.000001:
 		return Vector3.ZERO
 	var b: float = 2.0 * oc.dot(dir)
 	var c: float = oc.dot(oc) - radius * radius
-
 	var discriminant: float = b * b - 4.0 * a * c
 	if discriminant < 0.0:
 		return Vector3.ZERO
@@ -55,34 +65,25 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	var t0: float = (-b - sqrt_disc) * inv_2a
 	var t1: float = (-b + sqrt_disc) * inv_2a
 
-	# Collect valid positive intersections
-	var candidates: Array = []
+	var t: float = -1.0
 	if t0 > 0.001:
-		candidates.append(t0)
-	if t1 > 0.001:
-		candidates.append(t1)
+		t = t0
+	if t1 > 0.001 and (t < 0.0 or t1 < t):
+		t = t1
 
-	if candidates.is_empty():
+	if t < 0.001:
 		return Vector3.ZERO
 
-	# Sort by distance from camera (smallest t first)
-	candidates.sort()
+	var hit: Vector3 = center + dir * t
+	if hit.length() < radius * 0.7:
+		return Vector3.ZERO
 
-	# Try candidates starting from the closest
-	for tt in candidates:
-		var h: Vector3 = center + dir * tt
-		# Must be reasonably on the surface
-		if h.length() < radius * 0.7:
-			continue
-		var to_c: Vector3 = (from - center).normalized()
-		var to_h: Vector3 = (h - center).normalized()
-		# Accept if reasonably front-facing
-		if to_h.dot(to_c) > -0.92:
-			return h
+	var to_cam: Vector3 = (from - center).normalized()
+	var to_hit: Vector3 = (hit - center).normalized()
+	if to_hit.dot(to_cam) < -0.85:
+		return Vector3.ZERO
 
-	# If none of the candidates were good, reject
-	print("[Globe][Raycast] All candidates were back-side or inside - rejecting click")
-	return Vector3.ZERO
+	return hit
 
 func show_click_ring(world_pos: Vector3) -> void:
 	var ring := MeshInstance3D.new()
@@ -324,3 +325,18 @@ func _add_line_string(line_coords: Array, vertices: PackedVector3Array) -> void:
 		if p1.size() < 2 or p2.size() < 2: continue
 		vertices.append(lat_lon_to_vector3(p1[1], p1[0], earth_radius * SURFACE_LIFT))
 		vertices.append(lat_lon_to_vector3(p2[1], p2[0], earth_radius * SURFACE_LIFT))
+
+# Physics-based click collider for reliable front-side raycasting
+func _create_click_collider() -> void:
+	var static_body := StaticBody3D.new()
+	static_body.name = "ClickCollider"
+	static_body.collision_layer = 2
+	static_body.collision_mask = 0
+
+	var shape := CollisionShape3D.new()
+	var sphere := SphereShape3D.new()
+	sphere.radius = earth_radius * 1.002
+	shape.shape = sphere
+
+	static_body.add_child(shape)
+	add_child(static_body)
