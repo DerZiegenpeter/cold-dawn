@@ -20,13 +20,18 @@ func generate_path(entity: Node3D, target: Vector3) -> Array[Vector3]:
 	# Try direct first
 	var direct: Array[Vector3] = _generate_direct_path(start, target)
 	if _is_path_valid(direct, etype):
+		print("[Pathfinding] Direct path valid for ", etype)
 		return direct
+
+	print("[Pathfinding] Direct path INVALID for ", etype, " - searching detour...")
 
 	# Search for a detour that stays on the correct domain
 	var detour: Array[Vector3] = _find_detour_path(start, target, etype)
 	if not detour.is_empty() and _is_path_valid(detour, etype):
+		print("[Pathfinding] Detour path found with ", detour.size(), " waypoints")
 		return detour
 
+	print("[Pathfinding] No valid detour found - falling back to direct (may be blocked)")
 	# Last resort: still return a direct path so the unit at least tries
 	# (MovementSystem will stop it if it leaves the domain)
 	return direct

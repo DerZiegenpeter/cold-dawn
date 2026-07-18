@@ -16,11 +16,15 @@ const ENTITY_SPEEDS := {
 
 func request_move(entity: Node, target_world_pos: Vector3) -> bool:
 	if not is_instance_valid(entity):
+		print("[Movement] request_move: invalid entity")
 		return false
 
 	var entity_3d := entity as Node3D
 	if entity_3d == null:
+		print("[Movement] request_move: not a Node3D")
 		return false
+
+	print("[Movement] request_move called for ", entity.name if "name" in entity else entity, " to ", target_world_pos)
 
 	var pathfinding = get_node_or_null("/root/PathfindingSystem")
 	var path: Array[Vector3] = []
@@ -28,12 +32,14 @@ func request_move(entity: Node, target_world_pos: Vector3) -> bool:
 	if pathfinding and pathfinding.has_method("generate_path"):
 		path = pathfinding.generate_path(entity_3d, target_world_pos)
 	else:
-		# Fallback: pure great-circle
+		print("[Movement] PathfindingSystem not found, using direct fallback")
 		path = _generate_direct_fallback(entity_3d.global_position, target_world_pos)
 
 	if path.is_empty():
+		print("[Movement] No path generated!")
 		return false
 
+	print("[Movement] Path with ", path.size(), " waypoints set")
 	_apply_path(entity, path)
 	return true
 
@@ -149,6 +155,7 @@ func update_movement(entity: Node, delta: float) -> void:
 				entity._orient_to_surface()
 			if "last_valid_pos" in entity:
 				entity.last_valid_pos = entity_3d.global_position
+			print("[Movement] Reached final waypoint, path complete")
 			return
 	else:
 		var t: float = step / angle if angle > 0.001 else 1.0
@@ -161,8 +168,10 @@ func update_movement(entity: Node, delta: float) -> void:
 		var valid: bool = true
 		if requires_land and not on_land:
 			valid = false
+			print("[Movement] Ground unit left land - stopping")
 		elif requires_water and on_land:
 			valid = false
+			print("[Movement] Naval unit hit land - stopping")
 		if not valid:
 			if "last_valid_pos" in entity and entity.last_valid_pos != Vector3.ZERO:
 				entity_3d.global_position = entity.last_valid_pos
@@ -173,41 +182,4 @@ func update_movement(entity: Node, delta: float) -> void:
 		entity._orient_to_surface()
 	if "last_valid_pos" in entity:
 		entity.last_valid_pos = entity_3d.global_position
-
-
-func _show_path_visualization(globe: Node, path: Array) -> void:
-	_hide_path_visualization()
-	if path.size() < 2 or not globe:
-		return
-
-	var mesh_instance: MeshInstance3D = MeshInstance3D.new()
-	mesh_instance.name = "PathVisualizer"
-
-	var immediate_mesh: ImmediateMesh = ImmediateMesh.new()
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.emission_enabled = true
-	material.emission = Color(0.3, 0.65, 1.0)
-	material.emission_energy_multiplier = 4.0
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(0.5, 0.8, 1.0, 0.85)
-	material.render_priority = 50
-
-	var lift: float = 5.0
-	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, material)
-	for pos in path:
-		if pos is Vector3:
-			var lifted: Vector3 = pos.normalized() * (pos.length() + lift)
-			immediate_mesh.surface_add_vertex(lifted)
-	immediate_mesh.surface_end()
-
-	mesh_instance.mesh = immediate_mesh
-	globe.add_child(mesh_instance)
-	_path_visualizer = mesh_instance
-
-
-func _hide_path_visualization() -> void:
-	if _path_visualizer and is_instance_valid(_path_visualizer):
-		_path_visualizer.queue_free()
-	_path_visualizer = null
+	print("[Movement] Moving ", etype, " step, remaining waypoints: ", path.size() - index)
