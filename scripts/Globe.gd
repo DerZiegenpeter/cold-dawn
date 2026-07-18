@@ -34,7 +34,7 @@ func get_state_polygons() -> Dictionary:
 func get_state_centers() -> Dictionary:
 	return state_centers
 
-# Robust sphere raycast – always returns the closest front-side hit
+# Robust sphere raycast - prefers near front-side hit and rejects bad intersections
 func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	var radius: float = earth_radius * 1.002
 	var center: Vector3 = global_position
@@ -55,37 +55,38 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	var t0: float = (-b - sqrt_disc) * inv_2a
 	var t1: float = (-b + sqrt_disc) * inv_2a
 
-	# Prefer the smaller positive t, but if it leads to a very back-side hit,
-	# try the other one if it is more front-facing.
+	# Always prefer the closest positive intersection
 	var t: float = -1.0
 	if t0 > 0.001:
 		t = t0
 	if t1 > 0.001 and (t < 0.0 or t1 < t):
 		t = t1
 
-	if t < 0.0:
-		return Vector3.ZERO
-
-	# Reject absurdly far hits (safety against numerical issues)
-	if t > 8000.0:
+	if t < 0.001:
 		return Vector3.ZERO
 
 	var hit: Vector3 = center + dir * t
 
+	# Safety: reject hits that are way too close to center (inside the globe)
+	if hit.length() < radius * 0.6:
+		return Vector3.ZERO
+
+	# Front-side preference
 	var to_cam: Vector3 = (from - center).normalized()
 	var to_hit: Vector3 = (hit - center).normalized()
-
-	# If the chosen hit is strongly back-facing, try swapping to the other intersection
-	if to_hit.dot(to_cam) < -0.6 and t0 > 0.001 and t1 > 0.001:
+	if to_hit.dot(to_cam) < -0.7:
+		# Try the other intersection if it is better
 		var other_t = t1 if (t == t0) else t0
-		var other_hit = center + dir * other_t
-		var other_to_hit = (other_hit - center).normalized()
-		if other_to_hit.dot(to_cam) > to_hit.dot(to_cam):
-			hit = other_hit
-			to_hit = other_to_hit
+		if other_t > 0.001:
+			var other_hit = center + dir * other_t
+			if other_hit.length() > radius * 0.6:
+				var other_to_hit = (other_hit - center).normalized()
+				if other_to_hit.dot(to_cam) > to_hit.dot(to_cam):
+					hit = other_hit
 
-	# Final guard - reject only if still extremely back-side after possible swap
-	if to_hit.dot(to_cam) < -0.92:
+	# Final guard
+	to_hit = (hit - center).normalized()
+	if to_hit.dot(to_cam) < -0.85:
 		print("[Globe][Raycast] Rejected back-side hit (dot = ", to_hit.dot(to_cam), ")")
 		return Vector3.ZERO
 
