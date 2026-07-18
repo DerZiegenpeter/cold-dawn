@@ -156,7 +156,13 @@ func _handle_left_click() -> void:
 		UnitManager.deselect()
 
 func _handle_right_click() -> void:
-	if not UnitManager.selected_entity: return
+	print("[Camera] _handle_right_click triggered")
+
+	if not UnitManager.selected_entity:
+		print("[Camera] No selected_entity - aborting right-click movement")
+		return
+
+	print("[Camera] Selected entity: ", UnitManager.selected_entity)
 
 	var mouse_pos := get_viewport().get_mouse_position()
 
@@ -174,6 +180,8 @@ func _handle_right_click() -> void:
 	var from := project_ray_origin(mouse_pos)
 	var dir := project_ray_normal(mouse_pos)
 	var hit_pos := _raycast_to_globe_sphere(from, dir)
+
+	print("[Camera] Raycast result: hit_pos = ", hit_pos)
 
 	if hit_pos != Vector3.ZERO:
 		var selected = UnitManager.selected_entity
@@ -257,7 +265,8 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	# Final front-side guard: reject if the hit is on the opposite side of the globe
 	var to_cam: Vector3 = (from - center).normalized()
 	var to_hit: Vector3 = (hit - center).normalized()
-	if to_hit.dot(to_cam) < -0.05:
+	if to_hit.dot(to_cam) < -0.25:   # relaxed for testing
+		print("[Camera][Raycast] Rejected back-side hit (dot = ", to_hit.dot(to_cam), ")")
 		return Vector3.ZERO
 
 	return hit

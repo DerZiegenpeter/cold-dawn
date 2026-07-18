@@ -74,7 +74,8 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	# Extra front-side guard (prevents rare back-face hits when camera is very close)
 	var to_cam: Vector3 = (from - center).normalized()
 	var to_hit: Vector3 = (hit - center).normalized()
-	if to_hit.dot(to_cam) < -0.05:
+	if to_hit.dot(to_cam) < -0.25:   # relaxed for testing
+		print("[Globe][Raycast] Rejected back-side hit (dot = ", to_hit.dot(to_cam), ")")
 		return Vector3.ZERO
 
 	return hit
@@ -146,66 +147,66 @@ func create_states() -> void:
 		index += 1
 		var state_id: int = index
 
-		var vertices: PackedVector3Array = PackedVector3Array()
+	var vertices: PackedVector3Array = PackedVector3Array()
 		_add_geometry(feature.get("geometry", {}), vertices)
 
-		var geometry: Dictionary = feature.get("geometry", {})
-		var geometry_type: String = str(geometry.get("type", ""))
+	var geometry: Dictionary = feature.get("geometry", {})
+	var geometry_type: String = str(geometry.get("type", ""))
 
-		if geometry_type == "Polygon" or geometry_type == "MultiPolygon":
-			var coords_variant = geometry.get("coordinates", [])
-			var coords: Array = coords_variant if coords_variant is Array else []
-			var outer: Array = []
-			if geometry_type == "Polygon" and coords.size() > 0:
-				outer = coords[0] if coords[0] is Array else []
-			elif geometry_type == "MultiPolygon" and coords.size() > 0:
-				var first_poly = coords[0] if coords[0] is Array else []
-				if first_poly.size() > 0:
-					outer = first_poly[0] if first_poly[0] is Array else []
+	if geometry_type == "Polygon" or geometry_type == "MultiPolygon":
+		var coords_variant = geometry.get("coordinates", [])
+		var coords: Array = coords_variant if coords_variant is Array else []
+		var outer: Array = []
+		if geometry_type == "Polygon" and coords.size() > 0:
+			outer = coords[0] if coords[0] is Array else []
+		elif geometry_type == "MultiPolygon" and coords.size() > 0:
+			var first_poly = coords[0] if coords[0] is Array else []
+			if first_poly.size() > 0:
+				outer = first_poly[0] if first_poly[0] is Array else []
 			if outer.size() > 0:
 				state_polygons[state_id] = outer
 
-		if vertices.is_empty():
-			continue
+	if vertices.is_empty():
+		continue
 
-		var center: Vector3 = Vector3.ZERO
-		for v in vertices:
-			center += v
-		if vertices.size() > 0:
-			center /= float(vertices.size())
-			center = center.normalized() * (earth_radius * SURFACE_LIFT)
+	var center: Vector3 = Vector3.ZERO
+	for v in vertices:
+		center += v
+	if vertices.size() > 0:
+		center /= float(vertices.size())
+		center = center.normalized() * (earth_radius * SURFACE_LIFT)
 
-		state_centers[state_id] = center
+	state_centers[state_id] = center
 
-		var local: PackedVector3Array = PackedVector3Array()
-		local.resize(vertices.size())
-		for i in range(vertices.size()):
-			local[i] = vertices[i] - center
+	var local: PackedVector3Array = PackedVector3Array()
+	local.resize(vertices.size())
+	for i in range(vertices.size()):
+		local[i] = vertices[i] - center
 
-		var mesh: ArrayMesh = ArrayMesh.new()
-		var arrays: Array = []
-		arrays.resize(Mesh.ARRAY_MAX)
-		arrays[Mesh.ARRAY_VERTEX] = local
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
+	var mesh: ArrayMesh = ArrayMesh.new()
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = local
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
 
-		var mi: MeshInstance3D = MeshInstance3D.new()
-		mi.name = "State_" + str(state_id)
-		mi.mesh = mesh
-		mi.position = center
+	var mi: MeshInstance3D = MeshInstance3D.new()
+	mi.name = "State_" + str(state_id)
+	mi.mesh = mesh
+	mi.position = center
 
-		var mat: StandardMaterial3D = StandardMaterial3D.new()
-		mat.albedo_color = state_color
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.emission_enabled = true
-		mat.emission = state_color
-		mat.emission_energy_multiplier = state_emission_energy
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.render_priority = 8
-		mat.albedo_color.a = 0.0
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
+	mat.albedo_color = state_color
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.emission_enabled = true
+	mat.emission = state_color
+	mat.emission_energy_multiplier = state_emission_energy
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.render_priority = 8
+	mat.albedo_color.a = 0.0
 
-		mi.material_override = mat
-		add_child(mi)
-		created += 1
+	mi.material_override = mat
+	add_child(mi)
+	created += 1
 
 	print("States erstellt: ", created)
 
