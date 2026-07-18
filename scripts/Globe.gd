@@ -34,7 +34,7 @@ func get_state_polygons() -> Dictionary:
 func get_state_centers() -> Dictionary:
 	return state_centers
 
-# Robust sphere raycast - prefers near front-side hit and rejects bad intersections
+# Final robust raycast - always prefers the closest visible (front) intersection
 func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	var radius: float = earth_radius * 1.002
 	var center: Vector3 = global_position
@@ -55,42 +55,34 @@ func _raycast_to_globe_sphere(from: Vector3, dir: Vector3) -> Vector3:
 	var t0: float = (-b - sqrt_disc) * inv_2a
 	var t1: float = (-b + sqrt_disc) * inv_2a
 
-	# Always prefer the closest positive intersection
-	var t: float = -1.0
+	# Collect valid positive intersections
+	var candidates: Array = []
 	if t0 > 0.001:
-		t = t0
-	if t1 > 0.001 and (t < 0.0 or t1 < t):
-		t = t1
+		candidates.append(t0)
+	if t1 > 0.001:
+		candidates.append(t1)
 
-	if t < 0.001:
+	if candidates.is_empty():
 		return Vector3.ZERO
 
-	var hit: Vector3 = center + dir * t
+	# Sort by distance from camera (smallest t first)
+	candidates.sort()
 
-	# Safety: reject hits that are way too close to center (inside the globe)
-	if hit.length() < radius * 0.6:
-		return Vector3.ZERO
+	# Try candidates starting from the closest
+	for tt in candidates:
+		var h: Vector3 = center + dir * tt
+		# Must be reasonably on the surface
+		if h.length() < radius * 0.7:
+			continue
+		var to_c: Vector3 = (from - center).normalized()
+		var to_h: Vector3 = (h - center).normalized()
+		# Accept if reasonably front-facing
+		if to_h.dot(to_c) > -0.92:
+			return h
 
-	# Front-side preference
-	var to_cam: Vector3 = (from - center).normalized()
-	var to_hit: Vector3 = (hit - center).normalized()
-	if to_hit.dot(to_cam) < -0.7:
-		# Try the other intersection if it is better
-		var other_t = t1 if (t == t0) else t0
-		if other_t > 0.001:
-			var other_hit = center + dir * other_t
-			if other_hit.length() > radius * 0.6:
-				var other_to_hit = (other_hit - center).normalized()
-				if other_to_hit.dot(to_cam) > to_hit.dot(to_cam):
-					hit = other_hit
-
-	# Final guard
-	to_hit = (hit - center).normalized()
-	if to_hit.dot(to_cam) < -0.85:
-		print("[Globe][Raycast] Rejected back-side hit (dot = ", to_hit.dot(to_cam), ")")
-		return Vector3.ZERO
-
-	return hit
+	# If none of the candidates were good, reject
+	print("[Globe][Raycast] All candidates were back-side or inside - rejecting click")
+	return Vector3.ZERO
 
 func show_click_ring(world_pos: Vector3) -> void:
 	var ring := MeshInstance3D.new()
