@@ -105,14 +105,14 @@ func _find_simple_detour(start: Vector3, target: Vector3, etype: String) -> Arra
 	axis = axis.normalized()
 
 	var best_path: Array[Vector3] = []
-	var best_cost := 1e30
+	var best_cost: float = 1e30
 
 	# Only try a few sensible offsets - much faster
-	var offsets := [20.0, 35.0, 50.0, 70.0]
+	var offsets: Array[float] = [20.0, 35.0, 50.0, 70.0]
 
-	for sign in [-1.0, 1.0]:
-		for ang_deg in offsets:
-			var offset := deg_to_rad(ang_deg) * sign
+	for sign: float in [-1.0, 1.0]:
+		for ang_deg: float in offsets:
+			var offset: float = deg_to_rad(ang_deg) * sign
 
 			var mid_base := start_dir.slerp(target_dir, 0.5)
 			var mid_dir := mid_base.rotated(axis, offset).normalized()
@@ -131,7 +131,7 @@ func _find_simple_detour(start: Vector3, target: Vector3, etype: String) -> Arra
 				for j in range(1, path2.size()):
 					combined.append(path2[j])
 
-				var cost := float(combined.size()) + ang_deg * 0.1
+				var cost: float = float(combined.size()) + ang_deg * 0.1
 				if cost < best_cost:
 					best_cost = cost
 					best_path = combined
