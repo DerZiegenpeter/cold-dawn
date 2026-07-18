@@ -57,9 +57,9 @@ func _generate_direct_path(start: Vector3, end: Vector3) -> Array[Vector3]:
 	var end_dir: Vector3 = end.normalized()
 	var angle: float = start_dir.angle_to(end_dir)
 
-	# More segments for longer arcs → smoother movement & better land checks
-	var segments: int = maxi(12, int(ceil(angle / deg_to_rad(3.5))))
-	segments = mini(segments, 64)
+	# Reasonable segment count for performance
+	var segments: int = maxi(8, int(ceil(angle / deg_to_rad(6.0))))
+	segments = mini(segments, 32)
 
 	var path: Array[Vector3] = []
 	var radius: float = start.length()
@@ -141,7 +141,7 @@ func _find_detour_path(start: Vector3, target: Vector3, etype: String) -> Array[
 				var path1: Array[Vector3] = _generate_direct_path(start, cand)
 				var path2: Array[Vector3] = _generate_direct_path(cand, target)
 
-				if _is_path_valid(path1, etype) and _is_path_valid(path2, etype):
+				if _is_path_valid(path1, etype) and _is_path_valid(path2, etype) and path1.size() > 0 and path2.size() > 0:
 					var combined: Array[Vector3] = []
 					combined.append_array(path1)
 					# Skip the duplicate mid-point
@@ -190,7 +190,7 @@ func _find_two_waypoint_detour(start: Vector3, target: Vector3, etype: String, a
 					var p2: Array[Vector3] = _generate_direct_path(mid1, mid2)
 					var p3: Array[Vector3] = _generate_direct_path(mid2, target)
 
-					if _is_path_valid(p1, etype) and _is_path_valid(p2, etype) and _is_path_valid(p3, etype):
+					if _is_path_valid(p1, etype) and _is_path_valid(p2, etype) and _is_path_valid(p3, etype) and p1.size() > 0 and p2.size() > 0 and p3.size() > 0:
 						var combined: Array[Vector3] = []
 						combined.append_array(p1)
 						for i in range(1, p2.size()):
